@@ -1,0 +1,4861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>ESCAPE THE CURSED WOODS — 3D Survival Horror</title>
+  <!-- Load Three.js r128 from reliable CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- Atmospheric Dark-Fantasy & Clean UI Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #030508;
+      font-family: 'Inter', sans-serif;
+      color: #e6efec;
+    }
+
+    #game-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+    }
+
+    /* Atmospheric Peripheral Vignette */
+    #terror-vignette {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 5;
+      background: radial-gradient(circle at center, transparent 46%, rgba(3, 6, 10, 0.72) 84%, rgba(0, 0, 0, 0.96) 100%);
+    }
+
+    /* Crimson-Amber Adrenaline Pulse Vignette */
+    #adrenaline-vignette {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 6;
+      opacity: 0;
+      background: radial-gradient(
+        circle at center,
+        transparent 38%,
+        rgba(245, 158, 11, 0.16) 68%,
+        rgba(220, 38, 38, 0.52) 100%
+      );
+      mix-blend-mode: screen;
+    }
+
+    #jumpscare-flash {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 25;
+      opacity: 0;
+      background: radial-gradient(circle at center, rgba(118, 255, 3, 0.62) 0%, rgba(10, 16, 6, 0.97) 75%);
+    }
+
+    /* Cinematic Cutscene Letterbox Bars & Controls */
+    .letterbox-bar {
+      position: fixed;
+      left: 0;
+      right: 0;
+      height: 11.5vh;
+      background: #020305;
+      z-index: 18;
+      pointer-events: none;
+      transition: transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    #letterbox-top {
+      top: 0;
+      transform: translateY(-102%);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    #letterbox-bottom {
+      bottom: 0;
+      transform: translateY(102%);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    body.cutscene-active #letterbox-top,
+    body.cutscene-active #letterbox-bottom {
+      transform: translateY(0);
+    }
+
+    #skip-cutscene-btn {
+      position: fixed;
+      bottom: 3.4vh;
+      right: 24px;
+      z-index: 19;
+      background: rgba(8, 14, 20, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #d8e6e2;
+      padding: 8px 16px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.35s ease, border-color 0.2s ease, background 0.2s ease;
+    }
+
+    #skip-cutscene-btn.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    #skip-cutscene-btn:hover {
+      border-color: #ffd166;
+      background: rgba(20, 30, 40, 0.95);
+    }
+
+    #cutscene-caption {
+      position: fixed;
+      bottom: 14.5vh;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 19;
+      font-family: 'Cinzel', serif;
+      font-size: clamp(0.95rem, 2.2vw, 1.25rem);
+      letter-spacing: 0.14em;
+      color: #f4f7f5;
+      text-shadow: 0 2px 16px rgba(0, 0, 0, 0.95);
+      text-align: center;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.45s ease;
+      max-width: 88vw;
+    }
+
+    #cutscene-caption.visible {
+      opacity: 1;
+    }
+
+    /* HUD Layer */
+    #hud {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      pointer-events: none;
+      display: none;
+      padding: 16px 20px;
+    }
+
+    .hud-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .objective-panel {
+      background: rgba(6, 11, 16, 0.82);
+      border: 1px solid rgba(0, 245, 212, 0.26);
+      border-left: 3px solid #00f5d4;
+      padding: 11px 15px;
+      border-radius: 10px;
+      max-width: 350px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.72);
+    }
+
+    .objective-label {
+      font-size: 0.66rem;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: #5eead4;
+      margin-bottom: 4px;
+      font-weight: 700;
+    }
+
+    #objective-text {
+      font-size: 0.85rem;
+      color: #edf5f2;
+      line-height: 1.35;
+      margin-bottom: 9px;
+    }
+
+    .relic-tracker {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .relic-pip {
+      width: 21px;
+      height: 21px;
+      border-radius: 6px;
+      border: 1px solid rgba(0, 245, 212, 0.35);
+      background: rgba(12, 22, 26, 0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+    }
+
+    .relic-pip.collected {
+      background: rgba(255, 209, 102, 0.25);
+      border-color: #ffd166;
+      box-shadow: 0 0 12px rgba(255, 209, 102, 0.65);
+      transform: scale(1.08);
+    }
+
+    .relic-pip svg {
+      width: 12px;
+      height: 12px;
+      fill: #354b52;
+      transition: fill 0.25s ease;
+    }
+
+    .relic-pip.collected svg {
+      fill: #ffd166;
+    }
+
+    #relic-count-text {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #b7d0cb;
+      margin-left: 4px;
+    }
+
+    /* Top-Edge "Relic Sense" Directional Whisper Compass */
+    .relic-sense-bar {
+      position: fixed;
+      top: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(330px, 42vw);
+      height: 36px;
+      background: rgba(6, 11, 16, 0.8);
+      border: 1px solid rgba(0, 245, 212, 0.26);
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.65);
+      overflow: hidden;
+    }
+
+    .sense-center-notch {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 50%;
+      width: 2px;
+      margin-left: -1px;
+      background: rgba(255, 255, 255, 0.16);
+    }
+
+    .sense-label {
+      position: absolute;
+      bottom: 3px;
+      font-size: 0.56rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(212, 245, 236, 0.68);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    #nearest-relic-pip {
+      position: absolute;
+      top: 38%;
+      left: 50%;
+      width: 13px;
+      height: 13px;
+      margin-top: -6.5px;
+      margin-left: -6.5px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #ffffff 18%, #00f5d4 54%, #ffd166 85%, transparent 100%);
+      box-shadow: 0 0 12px #00f5d4, 0 0 22px rgba(255, 209, 102, 0.85);
+    }
+
+    #nearest-relic-pip.gate-mode {
+      background: radial-gradient(circle, #ffffff 18%, #ffd166 55%, #76ff03 90%, transparent 100%);
+      box-shadow: 0 0 15px #ffd166, 0 0 26px rgba(118, 255, 3, 0.9);
+      width: 15px;
+      height: 15px;
+      margin-top: -7.5px;
+      margin-left: -7.5px;
+    }
+
+    .hud-top-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      pointer-events: auto;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .hud-chip {
+      background: rgba(6, 11, 16, 0.82);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      padding: 7px 11px;
+      border-radius: 9px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #d6e4e0;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .hud-chip:hover {
+      border-color: rgba(0, 245, 212, 0.45);
+      background: rgba(12, 22, 28, 0.9);
+    }
+
+    /* Center Crosshair & Interaction Prompt */
+    #crosshair {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      width: 6px;
+      height: 6px;
+      margin: -3px 0 0 -3px;
+      border-radius: 50%;
+      background: rgba(235, 248, 244, 0.65);
+      box-shadow: 0 0 6px rgba(0, 0, 0, 0.95);
+      transition: transform 0.15s ease, background 0.15s ease;
+      pointer-events: none;
+    }
+
+    #crosshair.active {
+      transform: scale(2.1);
+      background: #ffd166;
+      box-shadow: 0 0 14px #ffd166;
+    }
+
+    #interact-prompt {
+      position: fixed;
+      top: calc(50% + 26px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(6, 11, 16, 0.92);
+      border: 1px solid rgba(255, 209, 102, 0.65);
+      color: #fef9ec;
+      padding: 7px 16px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      opacity: 0;
+      transition: opacity 0.16s ease;
+      pointer-events: none;
+      white-space: nowrap;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.8);
+    }
+
+    #interact-prompt.visible {
+      opacity: 1;
+    }
+
+    .key-badge {
+      display: inline-block;
+      background: rgba(255, 209, 102, 0.22);
+      border: 1px solid #ffd166;
+      color: #ffd166;
+      font-weight: 700;
+      font-size: 0.72rem;
+      padding: 1px 6px;
+      border-radius: 4px;
+      margin-right: 6px;
+    }
+
+    /* Atmospheric Toast Banner */
+    #status-banner {
+      position: fixed;
+      top: 94px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-10px);
+      background: rgba(7, 13, 18, 0.92);
+      border: 1px solid rgba(0, 245, 212, 0.45);
+      color: #e0fbf4;
+      padding: 9px 20px;
+      border-radius: 10px;
+      font-family: 'Cinzel', serif;
+      font-size: 0.92rem;
+      letter-spacing: 0.06em;
+      opacity: 0;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      pointer-events: none;
+      text-align: center;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85);
+      max-width: 90vw;
+    }
+
+    #status-banner.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* Bottom HUD Bars: Stamina + Adrenaline + Flashlight */
+    .hud-bottom {
+      position: fixed;
+      bottom: 16px;
+      left: 20px;
+      right: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      pointer-events: none;
+      gap: 12px;
+    }
+
+    .status-group {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      background: rgba(6, 11, 16, 0.84);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      padding: 11px 14px;
+      border-radius: 12px;
+      min-width: 260px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.72);
+      transition: border-color 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    .status-group.adrenaline-surging {
+      border-color: rgba(245, 158, 11, 0.7);
+      box-shadow: 0 8px 28px rgba(220, 38, 38, 0.38);
+    }
+
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.7rem;
+      color: #a9bdb8;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+    }
+
+    .bar-track {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    #stamina-fill {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, #0d9488, #00f5d4);
+      border-radius: 999px;
+    }
+
+    #stamina-fill.exhausted {
+      background: linear-gradient(90deg, #991b1b, #ef4444);
+    }
+
+    #stamina-fill.rush-boost {
+      background: linear-gradient(90deg, #f59e0b, #fef08a);
+    }
+
+    #adrenaline-fill {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, #d97706, #ef4444, #ff5252);
+      border-radius: 999px;
+    }
+
+    #adrenaline-status-text {
+      font-size: 0.66rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: #94a3b8;
+    }
+
+    #adrenaline-status-text.active {
+      color: #fbbf24;
+      text-shadow: 0 0 10px rgba(245, 158, 11, 0.65);
+    }
+
+    .stealth-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.07);
+    }
+
+    .stealth-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #00f5d4;
+    }
+
+    .flashlight-box {
+      background: rgba(6, 11, 16, 0.84);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      padding: 9px 13px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 0.8rem;
+    }
+
+    .light-indicator {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #ffe082;
+      box-shadow: 0 0 10px #ffe082;
+    }
+
+    .light-indicator.off {
+      background: #3b4448;
+      box-shadow: none;
+    }
+
+    /* Fullscreen Overlays (Title, Pause, Game Over, Victory) */
+    .modal-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: radial-gradient(circle at center, rgba(5, 9, 14, 0.62) 0%, rgba(2, 4, 6, 0.94) 100%);
+    }
+
+    #victory-screen {
+      background: radial-gradient(circle at center, rgba(6, 12, 20, 0.25) 0%, rgba(3, 6, 12, 0.72) 100%);
+    }
+
+    .modal-card {
+      background: linear-gradient(180deg, rgba(11, 18, 25, 0.95) 0%, rgba(6, 10, 15, 0.98) 100%);
+      border: 1px solid rgba(0, 245, 212, 0.3);
+      border-radius: 16px;
+      padding: 28px 32px;
+      max-width: 550px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 24px 64px rgba(0, 0, 0, 0.9), 0 0 40px rgba(0, 245, 212, 0.08);
+    }
+
+    .game-subtitle {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.24em;
+      color: #00f5d4;
+      margin-bottom: 7px;
+      font-weight: 700;
+    }
+
+    .game-title {
+      font-family: 'Cinzel', serif;
+      font-size: clamp(1.65rem, 4vw, 2.4rem);
+      font-weight: 800;
+      color: #f0f7f5;
+      letter-spacing: 0.06em;
+      line-height: 1.15;
+      margin-bottom: 12px;
+      text-shadow: 0 4px 20px rgba(0, 245, 212, 0.25);
+    }
+
+    .game-desc {
+      font-size: 0.89rem;
+      color: #aec2be;
+      line-height: 1.55;
+      margin-bottom: 18px;
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 9px;
+      text-align: left;
+      background: rgba(3, 6, 9, 0.74);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      padding: 13px 15px;
+      border-radius: 12px;
+      margin-bottom: 18px;
+      font-size: 0.8rem;
+    }
+
+    .control-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      color: #c5d6d2;
+    }
+
+    .control-key {
+      background: rgba(0, 245, 212, 0.14);
+      border: 1px solid rgba(0, 245, 212, 0.4);
+      color: #5eead4;
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-weight: 600;
+      font-size: 0.72rem;
+      white-space: nowrap;
+    }
+
+    .quality-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .quality-btn {
+      background: rgba(14, 24, 32, 0.9);
+      border: 1px solid rgba(0, 245, 212, 0.35);
+      color: #a7f3d0;
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .quality-btn:hover {
+      background: rgba(0, 245, 212, 0.18);
+      border-color: #00f5d4;
+    }
+
+    .primary-btn {
+      width: 100%;
+      padding: 13px 22px;
+      font-family: 'Cinzel', serif;
+      font-size: 1.02rem;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      color: #03090a;
+      background: linear-gradient(135deg, #00f5d4 0%, #0d9488 100%);
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      box-shadow: 0 6px 22px rgba(0, 245, 212, 0.35);
+      transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+    }
+
+    .primary-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(0, 245, 212, 0.55);
+      filter: brightness(1.06);
+    }
+
+    .gameover-title {
+      color: #ff5252;
+      text-shadow: 0 4px 22px rgba(255, 82, 82, 0.45);
+    }
+
+    .victory-title {
+      color: #ffd166;
+      text-shadow: 0 4px 22px rgba(255, 209, 102, 0.5);
+    }
+
+    .stats-summary {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin: 16px 0 20px;
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      border-radius: 10px;
+    }
+
+    .stat-box span {
+      display: block;
+      font-size: 0.66rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #8fa39f;
+      margin-bottom: 4px;
+    }
+
+    .stat-box strong {
+      font-size: 1.12rem;
+      color: #eef7f5;
+    }
+
+    /* Mobile Touch Controls */
+    #touch-controls {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 15;
+      pointer-events: none;
+    }
+
+    #touch-controls.force-visible {
+      display: block !important;
+    }
+
+    @media (pointer: coarse), (max-width: 768px) {
+      #touch-controls.active {
+        display: block;
+      }
+      .hud-bottom {
+        bottom: 136px;
+      }
+      .controls-grid {
+        grid-template-columns: 1fr;
+      }
+      .relic-sense-bar {
+        top: auto;
+        bottom: 222px;
+        width: 235px;
+      }
+      .status-group {
+        min-width: 210px;
+      }
+    }
+
+    #joystick-zone {
+      position: fixed;
+      bottom: 22px;
+      left: 22px;
+      width: 106px;
+      height: 106px;
+      border-radius: 50%;
+      background: rgba(10, 18, 24, 0.64);
+      border: 2px solid rgba(0, 245, 212, 0.38);
+      pointer-events: auto;
+      touch-action: none;
+    }
+
+    #joystick-knob {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 42px;
+      height: 42px;
+      margin: -21px 0 0 -21px;
+      border-radius: 50%;
+      background: rgba(0, 245, 212, 0.72);
+      box-shadow: 0 0 12px rgba(0, 245, 212, 0.45);
+    }
+
+    .touch-actions {
+      position: fixed;
+      bottom: 22px;
+      right: 22px;
+      display: grid;
+      grid-template-columns: repeat(2, 58px);
+      gap: 10px;
+      pointer-events: auto;
+    }
+
+    .touch-btn {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      background: rgba(10, 18, 24, 0.82);
+      border: 1px solid rgba(0, 245, 212, 0.45);
+      color: #e4f4f1;
+      font-size: 0.68rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      line-height: 1.1;
+      touch-action: manipulation;
+    }
+
+    .touch-btn:active, .touch-btn.pressed {
+      background: rgba(0, 245, 212, 0.35);
+      border-color: #00f5d4;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <!-- Main 3D WebGL Canvas -->
+  <canvas id="game-canvas"></canvas>
+
+  <!-- Post-processing atmospheric overlays -->
+  <div id="terror-vignette"></div>
+  <div id="adrenaline-vignette"></div>
+  <div id="jumpscare-flash"></div>
+
+  <!-- Cinematic Cutscene Letterbox Bars & Controls -->
+  <div class="letterbox-bar" id="letterbox-top"></div>
+  <div class="letterbox-bar" id="letterbox-bottom"></div>
+  <div id="cutscene-caption"></div>
+  <button id="skip-cutscene-btn">Skip Cutscene [Space]</button>
+
+  <!-- In-Game HUD -->
+  <div id="hud">
+    <div class="hud-top">
+      <div class="objective-panel">
+        <div class="objective-label">Objective</div>
+        <div id="objective-text">Follow the glowing spectral pillars to cleanse 5 Forest Seal Relics.</div>
+        <div class="relic-tracker" id="relic-pips">
+          <div class="relic-pip" data-idx="0"><svg viewBox="0 0 24 24"><path d="M12 2L4 9l8 13 8-13-8-7z"/></svg></div>
+          <div class="relic-pip" data-idx="1"><svg viewBox="0 0 24 24"><path d="M12 2L4 9l8 13 8-13-8-7z"/></svg></div>
+          <div class="relic-pip" data-idx="2"><svg viewBox="0 0 24 24"><path d="M12 2L4 9l8 13 8-13-8-7z"/></svg></div>
+          <div class="relic-pip" data-idx="3"><svg viewBox="0 0 24 24"><path d="M12 2L4 9l8 13 8-13-8-7z"/></svg></div>
+          <div class="relic-pip" data-idx="4"><svg viewBox="0 0 24 24"><path d="M12 2L4 9l8 13 8-13-8-7z"/></svg></div>
+          <span id="relic-count-text">0 / 5 Relics</span>
+        </div>
+      </div>
+
+      <!-- Top-Edge "Relic Sense" Directional Whisper Compass -->
+      <div class="relic-sense-bar" id="relic-sense-bar" title="Relic Sense — Whispers toward the nearest uncollected relic">
+        <div class="sense-center-notch"></div>
+        <div id="nearest-relic-pip"></div>
+        <span class="sense-label" id="sense-label">Relic Sense • Nearest</span>
+      </div>
+
+      <div class="hud-top-right">
+        <div class="hud-chip" id="fps-chip" title="Live Frame Rate">60 FPS</div>
+        <div class="hud-chip" id="timer-chip" title="Elapsed Time">00:00</div>
+        <button class="hud-chip" id="touch-toggle-btn" title="Toggle Touch Controls">📱 Touch</button>
+        <button class="hud-chip" id="mute-btn" title="Toggle Audio (M)">🔊 Audio</button>
+        <button class="hud-chip" id="pause-btn" title="Pause / Guide (P)">☰ Guide</button>
+      </div>
+    </div>
+
+    <div id="status-banner"></div>
+    <div id="crosshair"></div>
+    <div id="interact-prompt"><span class="key-badge">E</span> TAKE RELIC</div>
+
+    <div class="hud-bottom">
+      <div class="status-group" id="status-group">
+        <div class="status-row">
+          <span>Stamina</span>
+          <span class="stealth-badge" id="stealth-badge">
+            <span class="stealth-dot" id="stealth-dot"></span>
+            <span id="stealth-text">Exposed (Light)</span>
+          </span>
+        </div>
+        <div class="bar-track">
+          <div id="stamina-fill"></div>
+        </div>
+
+        <div class="status-row" style="margin-top: 2px;">
+          <span style="color:#fbbf24;">Adrenaline</span>
+          <span id="adrenaline-status-text">CALM</span>
+        </div>
+        <div class="bar-track">
+          <div id="adrenaline-fill"></div>
+        </div>
+      </div>
+
+      <div class="flashlight-box">
+        <div class="light-indicator" id="light-indicator"></div>
+        <span><strong style="color:#5eead4">[F]</strong> Flashlight: <strong id="light-status-text">ON</strong></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile / Touch Virtual Controls -->
+  <div id="touch-controls">
+    <div id="joystick-zone">
+      <div id="joystick-knob"></div>
+    </div>
+    <div class="touch-actions">
+      <button class="touch-btn" id="btn-touch-light">LIGHT</button>
+      <button class="touch-btn" id="btn-touch-interact">TAKE<br>RELIC</button>
+      <button class="touch-btn" id="btn-touch-crouch">CROUCH</button>
+      <button class="touch-btn" id="btn-touch-sprint">SPRINT</button>
+    </div>
+  </div>
+
+  <!-- Start / Title Overlay -->
+  <div class="modal-screen" id="title-screen">
+    <div class="modal-card">
+      <div class="game-subtitle">First-Person Survival Horror</div>
+      <h1 class="game-title">ESCAPE THE CURSED WOODS</h1>
+      <p class="game-desc">
+        Stalked through a midnight forest by an ancient <strong>Tree Demon</strong>, follow the glowing cyan-gold light pillars and <strong>Relic Sense</strong> to collect all <strong>5 Forest Seal Relics</strong>. When the beast tracks you, ride your <strong>Adrenaline Surge</strong> to break line of sight and flee through the <strong>Northern Exit Gate</strong>.
+      </p>
+
+      <div class="controls-grid">
+        <div class="control-item"><span>Move</span><span class="control-key">W A S D / Arrows</span></div>
+        <div class="control-item"><span>Look Around</span><span class="control-key">Mouse / Drag</span></div>
+        <div class="control-item"><span>Sprint</span><span class="control-key">Shift</span></div>
+        <div class="control-item"><span>Crouch / Hide</span><span class="control-key">C / Ctrl</span></div>
+        <div class="control-item"><span>Flashlight</span><span class="control-key">F / Right-Click</span></div>
+        <div class="control-item"><span>Take Relic</span><span class="control-key">E / Left-Click</span></div>
+      </div>
+
+      <div class="quality-row">
+        <button class="quality-btn" id="title-quality-btn">QUALITY: AUTO (HIGH)</button>
+      </div>
+
+      <button class="primary-btn" id="start-btn">ENTER THE CURSED WOODS</button>
+    </div>
+  </div>
+
+  <!-- Pause / Help Overlay -->
+  <div class="modal-screen hidden" id="pause-screen">
+    <div class="modal-card">
+      <div class="game-subtitle">Forest Survival Guide</div>
+      <h2 class="game-title" style="font-size:1.85rem;">PAUSED</h2>
+      <p class="game-desc">
+        <strong>Survival Tip:</strong> When the Tree Demon tracks you, your <strong>Adrenaline</strong> surges—granting <strong>+20% Sprint Speed</strong> and reduced stamina drain. Break line-of-sight behind gnarled trunks, douse your flashlight (<strong>F</strong>), and crouch (<strong>C</strong>) to lose its pursuit.
+      </p>
+      <div class="controls-grid">
+        <div class="control-item"><span>Move</span><span class="control-key">W A S D</span></div>
+        <div class="control-item"><span>Look</span><span class="control-key">Mouse</span></div>
+        <div class="control-item"><span>Sprint</span><span class="control-key">Shift</span></div>
+        <div class="control-item"><span>Crouch</span><span class="control-key">C / Ctrl</span></div>
+        <div class="control-item"><span>Flashlight</span><span class="control-key">F / Right-Click</span></div>
+        <div class="control-item"><span>Take Relic</span><span class="control-key">E / Left-Click</span></div>
+      </div>
+      <div class="quality-row">
+        <button class="quality-btn" id="pause-quality-btn">QUALITY: AUTO (HIGH)</button>
+      </div>
+      <button class="primary-btn" id="resume-btn">RESUME SURVIVAL</button>
+    </div>
+  </div>
+
+  <!-- Game Over Overlay -->
+  <div class="modal-screen hidden" id="gameover-screen">
+    <div class="modal-card" style="border-color: rgba(255, 82, 82, 0.45);">
+      <div class="game-subtitle" style="color: #ff5252;">Consumed by the Roots</div>
+      <h2 class="game-title gameover-title">YOU WERE CAUGHT</h2>
+      <p class="game-desc">
+        The Tree Demon's jagged wooden talons dragged you beneath the roots. Use your Adrenaline Surge to outrun its pursuit and break line-of-sight among the gnarled trunks.
+      </p>
+      <div class="stats-summary">
+        <div class="stat-box"><span>Relics Found</span><strong id="go-relics">0 / 5</strong></div>
+        <div class="stat-box"><span>Time Survived</span><strong id="go-time">00:00</strong></div>
+        <div class="stat-box"><span>Boss Escapes</span><strong id="go-escapes">0</strong></div>
+      </div>
+      <button class="primary-btn" id="retry-btn">PLAY AGAIN</button>
+    </div>
+  </div>
+
+  <!-- Victory Overlay (Displayed over the live post-escape 3D dawn clearing view) -->
+  <div class="modal-screen hidden" id="victory-screen">
+    <div class="modal-card" style="border-color: rgba(255, 209, 102, 0.55);">
+      <div class="game-subtitle" style="color: #ffd166;">Dawn Breaks Over the Clearing</div>
+      <h2 class="game-title victory-title">ESCAPED THE CURSED WOODS</h2>
+      <p class="game-desc">
+        The celestial ward barrier held fast against the Tree Demon's fury as first light pierced the midnight fog. You have survived the cursed forest.
+      </p>
+      <div class="stats-summary">
+        <div class="stat-box"><span>Escape Time</span><strong id="win-time">00:00</strong></div>
+        <div class="stat-box"><span>Relics</span><strong>5 / 5</strong></div>
+        <div class="stat-box"><span>Escapes / Surges</span><strong id="win-escapes">0 / 0</strong></div>
+      </div>
+      <button class="primary-btn" id="play-again-btn">PLAY AGAIN</button>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * ESCAPE THE CURSED WOODS — Ultra-Optimized 3D First-Person Survival Horror
+     *
+     * Key Performance & Visual Engineering:
+     *  1. Instanced Forest & Spatial Hash Grid:
+     *     - 4 grounded multi-part horror tree archetypes (flared root buttresses, twisted bark
+     *       trunk, crooked bare branches, and sparse dead canopy clusters) merged into unified
+     *       BufferGeometries and rendered via THREE.InstancedMesh.
+     *     - 2 boulder archetypes + soft radial contact-shadow discs instanced at y = 0.014.
+     *     - Real-time shadow maps disabled (renderer.shadowMap.enabled = false) and strict 4-light
+     *       budget (HemisphereLight, DirectionalLight, Flashlight SpotLight, Demon Chest PointLight)
+     *       for locked 60 FPS on both mobile and desktop GPUs.
+     *     - 2D Spatial Hash Grid (8m cells) for O(1) nearby obstacle collision & line-of-sight tests.
+     *     - Adaptive & Manual Quality Manager (AUTO / LOW / MED / HIGH) scaling pixelRatio, fog
+     *       draw distance, and particle density dynamically.
+     *  2. Highly Detailed Articulated 3D Tree Demon (~2.6m tall):
+     *     - Faceted dark bark skull, heavy brow plates, recessed glowing #76ff03 slanted eyes with
+     *       bright inner cores, jagged fangs, glowing maw, asymmetric twisted antler crown with
+     *       swaying mossy vines, overlapping layered bark chest/back armor, spiked mossy pauldrons,
+     *       lightning-shaped glowing chest rift, multi-jointed three-fingered clawed hands, glowing
+     *       shin fissures, and 5-toed splayed buttress root feet grounded on y = 0.
+     *  3. Slower Heavy Boss AI + Adrenaline Surge + 4-Phase Real-Time Escape Cutscene.
+     */
+
+    // =========================================================================
+    // 1. PROCEDURAL WEB AUDIO ENGINE
+    // =========================================================================
+    class SoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.masterGain = null;
+        this.muted = false;
+        this.initialized = false;
+        this.lastHeartbeatTime = 0;
+        this.lastBreathTime = 0;
+        this.lastStepTime = 0;
+        this.relicHumOsc = null;
+        this.relicHumGain = null;
+      }
+
+      init() {
+        if (this.initialized) {
+          if (this.ctx && this.ctx.state === 'suspended') {
+            this.ctx.resume();
+          }
+          return;
+        }
+        try {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioCtx();
+          this.masterGain = this.ctx.createGain();
+          this.masterGain.gain.value = this.muted ? 0 : 0.88;
+          this.masterGain.connect(this.ctx.destination);
+          this.startAmbientSoundscape();
+          this.initialized = true;
+        } catch (e) {
+          console.warn('Web Audio unavailable:', e);
+        }
+      }
+
+      toggleMute() {
+        this.muted = !this.muted;
+        if (this.masterGain && this.ctx) {
+          this.masterGain.gain.setTargetAtTime(this.muted ? 0 : 0.88, this.ctx.currentTime, 0.05);
+        }
+        return this.muted;
+      }
+
+      startAmbientSoundscape() {
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+
+        // 1. Howling Midnight Wind
+        const bufferSize = this.ctx.sampleRate * 4;
+        const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+        for (let i = 0; i < bufferSize; i++) {
+          const white = Math.random() * 2 - 1;
+          b0 = 0.99886 * b0 + white * 0.0555179;
+          b1 = 0.99332 * b1 + white * 0.0750759;
+          b2 = 0.96900 * b2 + white * 0.1538520;
+          b3 = 0.86650 * b3 + white * 0.3104856;
+          b4 = 0.55000 * b4 + white * 0.5329522;
+          b5 = -0.7616 * b5 - white * 0.0168980;
+          output[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.045;
+          b6 = white * 0.115926;
+        }
+
+        const windSource = this.ctx.createBufferSource();
+        windSource.buffer = noiseBuffer;
+        windSource.loop = true;
+
+        const windFilter = this.ctx.createBiquadFilter();
+        windFilter.type = 'bandpass';
+        windFilter.frequency.value = 340;
+        windFilter.Q.value = 3.2;
+
+        const windLfo = this.ctx.createOscillator();
+        windLfo.type = 'sine';
+        windLfo.frequency.value = 0.12;
+        const windLfoGain = this.ctx.createGain();
+        windLfoGain.gain.value = 185;
+        windLfo.connect(windLfoGain);
+        windLfoGain.connect(windFilter.frequency);
+
+        const windGain = this.ctx.createGain();
+        windGain.gain.value = 0.4;
+
+        windSource.connect(windFilter);
+        windFilter.connect(windGain);
+        windGain.connect(this.masterGain);
+        windSource.start(now);
+        windLfo.start(now);
+
+        // 2. Deep Horror Sub-Bass Drone
+        const droneOsc = this.ctx.createOscillator();
+        droneOsc.type = 'sawtooth';
+        droneOsc.frequency.value = 36;
+        const droneFilter = this.ctx.createBiquadFilter();
+        droneFilter.type = 'lowpass';
+        droneFilter.frequency.value = 90;
+        const droneGain = this.ctx.createGain();
+        droneGain.gain.value = 0.16;
+
+        droneOsc.connect(droneFilter);
+        droneFilter.connect(droneGain);
+        droneGain.connect(this.masterGain);
+        droneOsc.start(now);
+
+        // 3. Ethereal Relic Whisper Hum
+        this.relicHumOsc = this.ctx.createOscillator();
+        this.relicHumOsc.type = 'sine';
+        this.relicHumOsc.frequency.value = 220;
+        this.relicHumGain = this.ctx.createGain();
+        this.relicHumGain.gain.value = 0.0;
+        this.relicHumOsc.connect(this.relicHumGain);
+        this.relicHumGain.connect(this.masterGain);
+        this.relicHumOsc.start(now);
+      }
+
+      updateRelicHum(nearestRelicDist) {
+        if (!this.initialized || !this.relicHumGain) return;
+        const now = this.ctx.currentTime;
+        const proximity = Math.max(0, Math.min(1, 1 - nearestRelicDist / 24));
+        this.relicHumGain.gain.setTargetAtTime(proximity * 0.11, now, 0.12);
+        this.relicHumOsc.frequency.setTargetAtTime(220 + proximity * 110, now, 0.12);
+      }
+
+      playFlashlightClick(turnOn) {
+        if (!this.initialized || this.muted) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(turnOn ? 1500 : 1080, now);
+        osc.frequency.exponentialRampToValueAtTime(210, now + 0.035);
+
+        gain.gain.setValueAtTime(0.35, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.045);
+      }
+
+      playFootstep(isSprinting, isCrouching) {
+        if (!this.initialized || this.muted) return;
+        const now = this.ctx.currentTime;
+        const interval = isSprinting ? 0.28 : (isCrouching ? 0.64 : 0.44);
+        if (now - this.lastStepTime < interval) return;
+        this.lastStepTime = now;
+
+        const dur = 0.08;
+        const bufSize = Math.floor(this.ctx.sampleRate * dur);
+        const buf = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) {
+          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufSize * 0.34));
+        }
+
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buf;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.value = 780 + Math.random() * 520;
+        filter.Q.value = 1.5;
+
+        const gain = this.ctx.createGain();
+        const vol = isSprinting ? 0.24 : (isCrouching ? 0.06 : 0.13);
+        gain.gain.setValueAtTime(vol, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.masterGain);
+        noise.start(now);
+      }
+
+      playAdrenalineSurgeStinger() {
+        if (!this.initialized || this.muted) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(75, now);
+        osc.frequency.exponentialRampToValueAtTime(215, now + 0.38);
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(420, now);
+        filter.frequency.exponentialRampToValueAtTime(1150, now + 0.38);
+
+        gain.gain.setValueAtTime(0.01, now);
+        gain.gain.linearRampToValueAtTime(0.24, now + 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.6);
+      }
+
+      updateAdrenalineAudio(proximityRatio, adrenalineRatio) {
+        if (!this.initialized || this.muted) return;
+        const intensity = Math.max(proximityRatio, adrenalineRatio * 0.92);
+        if (intensity <= 0.08) return;
+
+        const now = this.ctx.currentTime;
+        const bpm = 64 + intensity * 114;
+        const beatInterval = 60 / bpm;
+
+        if (now - this.lastHeartbeatTime >= beatInterval) {
+          this.lastHeartbeatTime = now;
+          const vol = Math.min(0.75, intensity * 0.78);
+          this.triggerThump(now, 56, vol);
+          this.triggerThump(now + 0.13, 45, vol * 0.78);
+        }
+
+        if (adrenalineRatio > 0.38) {
+          const breathInterval = Math.max(0.56, 1.05 - adrenalineRatio * 0.44);
+          if (now - this.lastBreathTime >= breathInterval) {
+            this.lastBreathTime = now;
+            this.triggerBreathCycle(now, adrenalineRatio);
+          }
+        }
+      }
+
+      triggerBreathCycle(time, intensity) {
+        const dur = 0.24;
+        const bufSize = Math.floor(this.ctx.sampleRate * dur);
+        const buf = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) {
+          const env = Math.sin((i / bufSize) * Math.PI);
+          data[i] = (Math.random() * 2 - 1) * env;
+        }
+
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buf;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(480, time);
+        filter.frequency.linearRampToValueAtTime(640, time + dur * 0.5);
+        filter.frequency.linearRampToValueAtTime(360, time + dur);
+        filter.Q.value = 2.4;
+
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.001, time);
+        gain.gain.linearRampToValueAtTime(0.14 * intensity, time + dur * 0.45);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.masterGain);
+        noise.start(time);
+      }
+
+      triggerThump(time, freq, volume) {
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, time);
+        osc.frequency.exponentialRampToValueAtTime(22, time + 0.12);
+
+        gain.gain.setValueAtTime(volume, time);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + 0.14);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(time);
+        osc.stop(time + 0.15);
+      }
+
+      playDemonStomp(distance) {
+        if (!this.initialized || this.muted || distance > 54) return;
+        const now = this.ctx.currentTime;
+        const attenuation = Math.pow(1 - distance / 54, 1.7);
+
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(64, now);
+        osc.frequency.exponentialRampToValueAtTime(21, now + 0.34);
+
+        gain.gain.setValueAtTime(0.75 * attenuation, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.4);
+
+        const creak = this.ctx.createOscillator();
+        const creakGain = this.ctx.createGain();
+        creak.type = 'sawtooth';
+        creak.frequency.setValueAtTime(92 + Math.random() * 26, now);
+        creak.frequency.linearRampToValueAtTime(54, now + 0.28);
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 240;
+
+        creakGain.gain.setValueAtTime(0.18 * attenuation, now);
+        creakGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+
+        creak.connect(filter);
+        filter.connect(creakGain);
+        creakGain.connect(this.masterGain);
+        creak.start(now);
+        creak.stop(now + 0.32);
+      }
+
+      playDemonRoar() {
+        if (!this.initialized || this.muted) return;
+        const now = this.ctx.currentTime;
+        const freqs = [55, 82.5, 110];
+        freqs.forEach((f, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          const filter = this.ctx.createBiquadFilter();
+
+          osc.type = idx === 0 ? 'sawtooth' : 'square';
+          osc.frequency.setValueAtTime(f * 1.28, now);
+          osc.frequency.exponentialRampToValueAtTime(f * 0.5, now + 1.3);
+
+          filter.type = 'bandpass';
+          filter.frequency.setValueAtTime(340, now);
+          filter.frequency.exponentialRampToValueAtTime(120, now + 1.3);
+          filter.Q.value = 2.3;
+
+          gain.gain.setValueAtTime(0.01, now);
+          gain.gain.linearRampToValueAtTime(0.28 / (idx + 1), now + 0.14);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 1.35);
+
+          osc.connect(filter);
+          filter.connect(gain);
+          gain.connect(this.masterGain);
+          osc.start(now);
+          osc.stop(now + 1.4);
+        });
+      }
+
+      playBarrierSlam() {
+        if (!this.initialized || this.muted) return;
+        const now = this.ctx.currentTime;
+
+        const bass = this.ctx.createOscillator();
+        const bassGain = this.ctx.createGain();
+        bass.type = 'sine';
+        bass.frequency.setValueAtTime(95, now);
+        bass.frequency.exponentialRampToValueAtTime(24, now + 0.55);
+        bassGain.gain.setValueAtTime(0.7, now);
+        bassGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+        bass.connect(bassGain);
+        bassGain.connect(this.masterGain);
+        bass.start(now);
+        bass.stop(now + 0.62);
+
+        [523.25, 783.99, 1046.5].forEach((freq, i) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now);
+          osc.frequency.exponentialRampToValueAtTime(freq * 0.92, now + 0.8);
+          gain.gain.setValueAtTime(0.22 / (i + 1), now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+          osc.connect(gain);
+          gain.connect(this.masterGain);
+          osc.start(now);
+          osc.stop(now + 0.9);
+        });
+      }
+
+      playRelicPickup(count) {
+        if (!this.initialized || this.muted) return;
+        const now = this.ctx.currentTime;
+        const notes = [329.63, 392.00, 493.88, 659.25];
+        notes.forEach((freq, i) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq * (1 + count * 0.04), now + i * 0.07);
+
+          gain.gain.setValueAtTime(0.001, now + i * 0.07);
+          gain.gain.linearRampToValueAtTime(0.24, now + i * 0.07 + 0.03);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.07 + 0.9);
+
+          osc.connect(gain);
+          gain.connect(this.masterGain);
+          osc.start(now + i * 0.07);
+          osc.stop(now + i * 0.07 + 0.95);
+        });
+      }
+
+      playCutsceneEscapeScore() {
+        if (!this.initialized || this.muted) return;
+        const now = this.ctx.currentTime;
+        const chords = [
+          { time: 0.0, dur: 3.4, notes: [146.83, 220.00, 293.66, 349.23] },
+          { time: 3.2, dur: 3.8, notes: [130.81, 196.00, 261.63, 329.63] },
+          { time: 6.8, dur: 4.5, notes: [174.61, 261.63, 349.23, 440.00, 523.25] }
+        ];
+
+        chords.forEach((ch) => {
+          ch.notes.forEach((freq) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            const filter = this.ctx.createBiquadFilter();
+
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now + ch.time);
+
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(600, now + ch.time);
+            filter.frequency.linearRampToValueAtTime(1600, now + ch.time + ch.dur * 0.6);
+
+            gain.gain.setValueAtTime(0.001, now + ch.time);
+            gain.gain.linearRampToValueAtTime(0.095, now + ch.time + 0.65);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + ch.time + ch.dur);
+
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.masterGain);
+            osc.start(now + ch.time);
+            osc.stop(now + ch.time + ch.dur + 0.1);
+          });
+        });
+      }
+
+      playJumpscare() {
+        if (!this.initialized || this.muted) return;
+        const now = this.ctx.currentTime;
+        [105, 114, 228, 456, 890].forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = idx % 2 === 0 ? 'sawtooth' : 'square';
+          osc.frequency.setValueAtTime(freq, now);
+          osc.frequency.exponentialRampToValueAtTime(freq * 0.34, now + 0.95);
+
+          gain.gain.setValueAtTime(0.26, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+
+          osc.connect(gain);
+          gain.connect(this.masterGain);
+          osc.start(now);
+          osc.stop(now + 1.05);
+        });
+      }
+    }
+
+    const sound = new SoundEngine();
+
+    // =========================================================================
+    // 2. PROCEDURAL TEXTURES & GEOMETRY MERGING UTILITIES
+    // =========================================================================
+    function createBarkTextures() {
+      const w = 256, h = 256;
+      const diffCanvas = document.createElement('canvas');
+      diffCanvas.width = w; diffCanvas.height = h;
+      const dCtx = diffCanvas.getContext('2d');
+
+      const bumpCanvas = document.createElement('canvas');
+      bumpCanvas.width = w; bumpCanvas.height = h;
+      const bCtx = bumpCanvas.getContext('2d');
+
+      dCtx.fillStyle = '#241b15';
+      dCtx.fillRect(0, 0, w, h);
+      bCtx.fillStyle = '#707070';
+      bCtx.fillRect(0, 0, w, h);
+
+      for (let i = 0; i < 220; i++) {
+        const x = (i / 220) * w + (Math.random() - 0.5) * 4;
+        const ridgeW = 1.5 + Math.random() * 3.5;
+        const isCrevice = Math.random() < 0.45;
+        dCtx.strokeStyle = isCrevice
+          ? `rgba(14, 10, 7, ${0.55 + Math.random() * 0.4})`
+          : `rgba(64, 50, 39, ${0.35 + Math.random() * 0.45})`;
+        bCtx.strokeStyle = isCrevice ? 'rgba(15, 15, 15, 0.85)' : 'rgba(235, 235, 235, 0.65)';
+        dCtx.lineWidth = ridgeW;
+        bCtx.lineWidth = ridgeW;
+
+        dCtx.beginPath();
+        bCtx.beginPath();
+        let curX = x;
+        dCtx.moveTo(curX, 0);
+        bCtx.moveTo(curX, 0);
+        for (let y = 0; y <= h; y += 24) {
+          curX += Math.sin(y * 0.05 + i) * 2.4 + (Math.random() - 0.5) * 1.8;
+          dCtx.lineTo(curX, y);
+          bCtx.lineTo(curX, y);
+        }
+        dCtx.stroke();
+        bCtx.stroke();
+      }
+
+      const map = new THREE.CanvasTexture(diffCanvas);
+      const bumpMap = new THREE.CanvasTexture(bumpCanvas);
+      [map, bumpMap].forEach((tex) => {
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(2, 4);
+      });
+      return { map, bumpMap };
+    }
+
+    function createGroundTextures() {
+      const size = 256;
+      const diffCanvas = document.createElement('canvas');
+      diffCanvas.width = size; diffCanvas.height = size;
+      const dCtx = diffCanvas.getContext('2d');
+
+      dCtx.fillStyle = '#131813';
+      dCtx.fillRect(0, 0, size, size);
+
+      for (let i = 0; i < 1100; i++) {
+        const x = Math.random() * size;
+        const y = Math.random() * size;
+        const r = 1.2 + Math.random() * 3.8;
+        const pick = Math.random();
+        if (pick < 0.44) {
+          dCtx.fillStyle = `rgba(22, 34, 21, ${0.28 + Math.random() * 0.35})`;
+        } else if (pick < 0.78) {
+          dCtx.fillStyle = `rgba(38, 28, 19, ${0.3 + Math.random() * 0.4})`;
+        } else {
+          dCtx.fillStyle = `rgba(10, 13, 10, ${0.35 + Math.random() * 0.45})`;
+        }
+        dCtx.beginPath();
+        dCtx.ellipse(x, y, r, r * 0.65, Math.random() * Math.PI, 0, Math.PI * 2);
+        dCtx.fill();
+      }
+
+      const map = new THREE.CanvasTexture(diffCanvas);
+      map.wrapS = THREE.RepeatWrapping;
+      map.wrapT = THREE.RepeatWrapping;
+      map.repeat.set(44, 44);
+      return map;
+    }
+
+    function createContactShadowTexture() {
+      const size = 128;
+      const c = document.createElement('canvas');
+      c.width = size; c.height = size;
+      const ctx = c.getContext('2d');
+      const g = ctx.createRadialGradient(size / 2, size / 2, 4, size / 2, size / 2, size / 2);
+      g.addColorStop(0.0, 'rgba(2, 4, 3, 0.85)');
+      g.addColorStop(0.55, 'rgba(2, 4, 3, 0.45)');
+      g.addColorStop(1.0, 'rgba(2, 4, 3, 0.0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, size, size);
+      return new THREE.CanvasTexture(c);
+    }
+
+    function createCyanGoldPillarTexture() {
+      const c = document.createElement('canvas');
+      c.width = 64; c.height = 256;
+      const ctx = c.getContext('2d');
+      const grad = ctx.createLinearGradient(0, 256, 0, 0);
+      grad.addColorStop(0.0, 'rgba(255, 209, 102, 0.92)');
+      grad.addColorStop(0.24, 'rgba(0, 245, 212, 0.56)');
+      grad.addColorStop(0.64, 'rgba(255, 209, 102, 0.22)');
+      grad.addColorStop(1.0, 'rgba(0, 245, 212, 0.0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 64, 256);
+      return new THREE.CanvasTexture(c);
+    }
+
+    function createRuneCircleTexture() {
+      const size = 256;
+      const c = document.createElement('canvas');
+      c.width = size; c.height = size;
+      const ctx = c.getContext('2d');
+      const cx = size / 2, cy = size / 2;
+
+      ctx.clearRect(0, 0, size, size);
+      [112, 96, 66].forEach((r, idx) => {
+        ctx.lineWidth = idx === 0 ? 3.5 : 2;
+        ctx.strokeStyle = idx === 1 ? '#00f5d4' : '#ffd166';
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+      });
+
+      for (let i = 0; i < 12; i++) {
+        const ang = (i / 12) * Math.PI * 2;
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#00f5d4';
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(ang) * 66, cy + Math.sin(ang) * 66);
+        ctx.lineTo(cx + Math.cos(ang) * 112, cy + Math.sin(ang) * 112);
+        ctx.stroke();
+      }
+      return new THREE.CanvasTexture(c);
+    }
+
+    function createVolumetricConeTexture() {
+      const c = document.createElement('canvas');
+      c.width = 64; c.height = 256;
+      const ctx = c.getContext('2d');
+      const grad = ctx.createLinearGradient(0, 0, 0, 256);
+      grad.addColorStop(0.0, 'rgba(255, 245, 215, 0.22)');
+      grad.addColorStop(0.45, 'rgba(255, 245, 215, 0.07)');
+      grad.addColorStop(1.0, 'rgba(255, 245, 215, 0.0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 64, 256);
+      return new THREE.CanvasTexture(c);
+    }
+
+    function createSkyTexture() {
+      const w = 1024, h = 512;
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const ctx = c.getContext('2d');
+
+      // equirectangular SphereGeometry UV mapping:
+      // canvasY = 0 is top zenith (+Y), canvasY = h * 0.5 is horizon (y = 0), canvasY = h is nadir (-Y).
+      // Pure #030508 across the entire lower hemisphere + 22% band above the horizon (canvasY >= h * 0.39)
+      // guarantees 100% seamless blending into the #030508 distance fog with zero horizon seam.
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
+      skyGrad.addColorStop(0.0, '#020306');
+      skyGrad.addColorStop(0.20, '#040811');
+      skyGrad.addColorStop(0.32, '#060b14');
+      skyGrad.addColorStop(0.39, '#030508');
+      skyGrad.addColorStop(1.0, '#030508');
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(0, 0, w, h);
+
+      // Subtle, dim cold pinprick stars peeking only through the darkest upper zenith breaks
+      let starSeed = 9187;
+      const sRand = () => {
+        starSeed = (starSeed * 16807) % 2147483647;
+        return (starSeed - 1) / 2147483646;
+      };
+      for (let i = 0; i < 165; i++) {
+        const sx = sRand() * w;
+        const sy = Math.pow(sRand(), 1.55) * (h * 0.27);
+        const radius = 0.45 + sRand() * 0.85;
+        const alpha = (0.16 + sRand() * 0.34) * (1 - sy / (h * 0.28));
+        ctx.fillStyle = sRand() > 0.35
+          ? `rgba(186, 210, 238, ${alpha.toFixed(3)})`
+          : `rgba(148, 174, 212, ${alpha.toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(sx, sy, radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Layered ragged storm cloud banks in dark charcoal (#090e16) and bruised midnight (#0c1320)
+      // Wrapped horizontally at x, x - w, x + w so there is no seam on the sphere
+      for (let i = 0; i < 130; i++) {
+        const cx = sRand() * w;
+        const cy = h * 0.07 + sRand() * (h * 0.27);
+        const rx = 44 + sRand() * 115;
+        const ry = 10 + sRand() * 24;
+        const isMidnight = sRand() > 0.48;
+        const coreColor = isMidnight ? 'rgba(12, 19, 32, 0.56)' : 'rgba(9, 14, 22, 0.64)';
+        const midColor = isMidnight ? 'rgba(8, 13, 22, 0.28)' : 'rgba(6, 10, 16, 0.34)';
+
+        [-w, 0, w].forEach((offsetX) => {
+          const px = cx + offsetX;
+          if (px + rx < 0 || px - rx > w) return;
+          ctx.save();
+          ctx.translate(px, cy);
+          ctx.scale(1, ry / rx);
+          const g = ctx.createRadialGradient(0, 0, rx * 0.08, 0, 0, rx);
+          g.addColorStop(0.0, coreColor);
+          g.addColorStop(0.55, midColor);
+          g.addColorStop(1.0, 'rgba(3, 5, 8, 0.0)');
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(0, 0, rx, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        });
+      }
+
+      // Enforce smooth fade into pure #030508 at the horizon band so no cloud edge ever touches the horizon
+      const horizonMask = ctx.createLinearGradient(0, h * 0.31, 0, h * 0.41);
+      horizonMask.addColorStop(0.0, 'rgba(3, 5, 8, 0.0)');
+      horizonMask.addColorStop(1.0, 'rgba(3, 5, 8, 1.0)');
+      ctx.fillStyle = horizonMask;
+      ctx.fillRect(0, h * 0.31, w, h * 0.12);
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.ClampToEdgeWrapping;
+      return tex;
+    }
+
+    function createCloudDomeTexture() {
+      const w = 1024, h = 512;
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const ctx = c.getContext('2d');
+      ctx.clearRect(0, 0, w, h);
+
+      let cSeed = 3491;
+      const cRand = () => {
+        cSeed = (cSeed * 16807) % 2147483647;
+        return (cSeed - 1) / 2147483646;
+      };
+
+      // Wispy, tattered midnight storm clouds positioned between zenith and upper horizon
+      for (let i = 0; i < 150; i++) {
+        const cx = cRand() * w;
+        const cy = h * 0.08 + cRand() * (h * 0.26);
+        const rx = 38 + cRand() * 105;
+        const ry = 8 + cRand() * 20;
+        const alpha = 0.24 + cRand() * 0.34;
+        const tone = cRand() > 0.45 ? '11, 17, 28' : '7, 11, 18';
+
+        [-w, 0, w].forEach((offsetX) => {
+          const px = cx + offsetX;
+          if (px + rx < 0 || px - rx > w) return;
+          ctx.save();
+          ctx.translate(px, cy);
+          ctx.scale(1, ry / rx);
+          const g = ctx.createRadialGradient(0, 0, rx * 0.06, 0, 0, rx);
+          g.addColorStop(0.0, `rgba(${tone}, ${alpha.toFixed(3)})`);
+          g.addColorStop(0.52, `rgba(${tone}, ${(alpha * 0.45).toFixed(3)})`);
+          g.addColorStop(1.0, `rgba(${tone}, 0.0)`);
+          ctx.fillStyle = g;
+          ctx.beginPath();
+          ctx.arc(0, 0, rx, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        });
+      }
+
+      // Alpha-fade both near the zenith pole and near the horizon so drifting clouds never pinch or clip
+      ctx.globalCompositeOperation = 'destination-in';
+      const alphaMask = ctx.createLinearGradient(0, 0, 0, h);
+      alphaMask.addColorStop(0.0, 'rgba(255, 255, 255, 0.0)');
+      alphaMask.addColorStop(0.06, 'rgba(255, 255, 255, 0.85)');
+      alphaMask.addColorStop(0.28, 'rgba(255, 255, 255, 0.95)');
+      alphaMask.addColorStop(0.38, 'rgba(255, 255, 255, 0.0)');
+      alphaMask.addColorStop(1.0, 'rgba(255, 255, 255, 0.0)');
+      ctx.fillStyle = alphaMask;
+      ctx.fillRect(0, 0, w, h);
+      ctx.globalCompositeOperation = 'source-over';
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.ClampToEdgeWrapping;
+      return tex;
+    }
+
+    function createEerieMoonTexture() {
+      const size = 256;
+      const c = document.createElement('canvas');
+      c.width = size; c.height = size;
+      const ctx = c.getContext('2d');
+      const cx = size / 2, cy = size / 2;
+
+      // Wide, eerie diffused mist corona fading smoothly to transparent (zero hard polygon edges)
+      const haloGrad = ctx.createRadialGradient(cx, cy, 18, cx, cy, 128);
+      haloGrad.addColorStop(0.0, 'rgba(175, 200, 226, 0.44)');
+      haloGrad.addColorStop(0.18, 'rgba(130, 162, 198, 0.24)');
+      haloGrad.addColorStop(0.48, 'rgba(130, 162, 198, 0.09)');
+      haloGrad.addColorStop(0.78, 'rgba(130, 162, 198, 0.025)');
+      haloGrad.addColorStop(1.0, 'rgba(130, 162, 198, 0.0)');
+      ctx.fillStyle = haloGrad;
+      ctx.fillRect(0, 0, size, size);
+
+      // Softly feathered pale-silver cratered moon core (#cfd8e3)
+      const moonR = 25;
+      const coreGrad = ctx.createRadialGradient(cx - 4, cy - 4, 2, cx, cy, moonR + 3);
+      coreGrad.addColorStop(0.0, 'rgba(222, 230, 240, 0.98)');
+      coreGrad.addColorStop(0.76, 'rgba(207, 216, 227, 0.94)');
+      coreGrad.addColorStop(0.92, 'rgba(182, 196, 214, 0.55)');
+      coreGrad.addColorStop(1.0, 'rgba(130, 162, 198, 0.0)');
+      ctx.fillStyle = coreGrad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, moonR + 3, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Subtle dark lunar maria & crater blotches clipped to the feathered moon disc
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(cx, cy, moonR - 1, 0, Math.PI * 2);
+      ctx.clip();
+
+      const maria = [
+        { x: -7, y: -5, r: 8.5, a: 0.20 },
+        { x: 6, y: -8, r: 6.5, a: 0.17 },
+        { x: 8, y: 5, r: 9.0, a: 0.22 },
+        { x: -5, y: 9, r: 6.0, a: 0.16 },
+        { x: 0, y: 0, r: 5.0, a: 0.14 },
+        { x: -11, y: 3, r: 4.5, a: 0.15 }
+      ];
+      maria.forEach((m) => {
+        const mg = ctx.createRadialGradient(cx + m.x, cy + m.y, 1, cx + m.x, cy + m.y, m.r);
+        mg.addColorStop(0, `rgba(74, 88, 108, ${m.a})`);
+        mg.addColorStop(1, 'rgba(74, 88, 108, 0)');
+        ctx.fillStyle = mg;
+        ctx.beginPath();
+        ctx.arc(cx + m.x, cy + m.y, m.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.restore();
+
+      return new THREE.CanvasTexture(c);
+    }
+
+    function makeFaceted(geometry, jitter = 0.06, scaleY = 1) {
+      const nonIndexed = geometry.index ? geometry.toNonIndexed() : geometry;
+      const pos = nonIndexed.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i);
+        const y = pos.getY(i);
+        const z = pos.getZ(i);
+        const hash = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453;
+        const r1 = (hash - Math.floor(hash)) - 0.5;
+        const hash2 = Math.sin(x * 45.123 + y * 19.456 + z * 91.321) * 19283.123;
+        const r2 = (hash2 - Math.floor(hash2)) - 0.5;
+        pos.setXYZ(
+          i,
+          x + r1 * jitter,
+          (y + r2 * jitter * 0.7) * scaleY,
+          z + r1 * jitter
+        );
+      }
+      nonIndexed.computeVertexNormals();
+      return nonIndexed;
+    }
+
+    /**
+     * Merges an array of BufferGeometries into a single BufferGeometry so multi-part
+     * grounded tree archetypes can be rendered in 1 draw call via THREE.InstancedMesh.
+     */
+    function mergeGeometries(geos) {
+      const prepared = geos.map((g) => {
+        const ng = g.index ? g.toNonIndexed() : g.clone();
+        if (!ng.attributes.normal) ng.computeVertexNormals();
+        if (!ng.attributes.uv) {
+          const count = ng.attributes.position.count;
+          ng.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(count * 2), 2));
+        }
+        return ng;
+      });
+
+      let totalVerts = 0;
+      for (let i = 0; i < prepared.length; i++) {
+        totalVerts += prepared[i].attributes.position.count;
+      }
+
+      const positions = new Float32Array(totalVerts * 3);
+      const normals = new Float32Array(totalVerts * 3);
+      const uvs = new Float32Array(totalVerts * 2);
+
+      let offset = 0;
+      for (let i = 0; i < prepared.length; i++) {
+        const p = prepared[i].attributes.position.array;
+        const n = prepared[i].attributes.normal.array;
+        const u = prepared[i].attributes.uv.array;
+        positions.set(p, offset * 3);
+        normals.set(n, offset * 3);
+        uvs.set(u, offset * 2);
+        offset += prepared[i].attributes.position.count;
+        prepared[i].dispose();
+      }
+
+      const merged = new THREE.BufferGeometry();
+      merged.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      merged.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+      merged.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+      return merged;
+    }
+
+    // =========================================================================
+    // 3. HIGHLY DETAILED ARTICULATED 3D TREE DEMON BOSS (~2.6m TALL)
+    // =========================================================================
+    function createTreeDemon() {
+      const root = new THREE.Group();
+
+      const barkMat = new THREE.MeshStandardMaterial({
+        color: 0x3b2f26,
+        roughness: 0.9,
+        metalness: 0.06,
+        flatShading: true
+      });
+      const darkBarkMat = new THREE.MeshStandardMaterial({
+        color: 0x201812,
+        roughness: 0.95,
+        metalness: 0.05,
+        flatShading: true
+      });
+      const ridgeBarkMat = new THREE.MeshStandardMaterial({
+        color: 0x4b3b2f,
+        roughness: 0.86,
+        metalness: 0.05,
+        flatShading: true
+      });
+      const mossMat = new THREE.MeshStandardMaterial({
+        color: 0x4c6b27,
+        roughness: 0.84,
+        metalness: 0.02,
+        flatShading: true,
+        side: THREE.DoubleSide
+      });
+      const brightMossMat = new THREE.MeshStandardMaterial({
+        color: 0x6b9435,
+        roughness: 0.78,
+        flatShading: true,
+        side: THREE.DoubleSide
+      });
+      const glowMat = new THREE.MeshStandardMaterial({
+        color: 0x76ff03,
+        emissive: 0x76ff03,
+        emissiveIntensity: 2.5,
+        roughness: 0.25,
+        flatShading: true
+      });
+      const hotCoreMat = new THREE.MeshStandardMaterial({
+        color: 0xeaffd0,
+        emissive: 0xaeea00,
+        emissiveIntensity: 3.2,
+        roughness: 0.15,
+        flatShading: true
+      });
+
+      // Pelvis & Layered Bark/Moss Waist Loin-Leaves
+      const pelvis = new THREE.Group();
+      pelvis.position.y = 1.12;
+      root.add(pelvis);
+
+      const waistMesh = new THREE.Mesh(
+        makeFaceted(new THREE.CylinderGeometry(0.26, 0.22, 0.36, 8), 0.045),
+        darkBarkMat
+      );
+      pelvis.add(waistMesh);
+
+      for (let i = 0; i < 8; i++) {
+        const angle = (i / 8) * Math.PI * 2;
+        const plate = new THREE.Mesh(
+          makeFaceted(new THREE.ConeGeometry(0.12, 0.50, 4), 0.022),
+          i % 2 === 0 ? mossMat : barkMat
+        );
+        plate.position.set(Math.sin(angle) * 0.23, -0.20, Math.cos(angle) * 0.23);
+        plate.rotation.x = Math.PI + Math.cos(angle) * 0.25;
+        plate.rotation.z = -Math.sin(angle) * 0.25;
+        pelvis.add(plate);
+      }
+
+      // Broad Hunched Torso with Overlapping Bark Armor Shards & Dorsal Spine
+      const torso = new THREE.Group();
+      torso.position.y = 0.22;
+      pelvis.add(torso);
+
+      const chestMesh = new THREE.Mesh(
+        makeFaceted(new THREE.CylinderGeometry(0.50, 0.26, 0.74, 9, 2), 0.065),
+        barkMat
+      );
+      chestMesh.position.y = 0.36;
+      chestMesh.scale.set(1.22, 1.0, 0.80);
+      torso.add(chestMesh);
+
+      // Overlapping Vertical Faceted Bark Chest Plates framing the Rift
+      [-1, 1].forEach((side) => {
+        const pecPlate = new THREE.Mesh(
+          makeFaceted(new THREE.BoxGeometry(0.32, 0.44, 0.14), 0.03),
+          ridgeBarkMat
+        );
+        pecPlate.position.set(side * 0.24, 0.44, 0.29);
+        pecPlate.rotation.set(-0.12, -side * 0.28, side * 0.15);
+        torso.add(pecPlate);
+
+        const ribPlate = new THREE.Mesh(
+          makeFaceted(new THREE.BoxGeometry(0.24, 0.26, 0.12), 0.025),
+          darkBarkMat
+        );
+        ribPlate.position.set(side * 0.20, 0.20, 0.24);
+        ribPlate.rotation.set(0.08, -side * 0.32, -side * 0.18);
+        torso.add(ribPlate);
+      });
+
+      // Jagged Dorsal Spine Ridges along the Back
+      for (let sp = 0; sp < 4; sp++) {
+        const spineSpike = new THREE.Mesh(
+          makeFaceted(new THREE.ConeGeometry(0.11 - sp * 0.015, 0.38 - sp * 0.04, 4), 0.025),
+          sp % 2 === 0 ? darkBarkMat : ridgeBarkMat
+        );
+        spineSpike.position.set(0, 0.62 - sp * 0.16, -0.27 + sp * 0.02);
+        spineSpike.rotation.x = -0.65 - sp * 0.1;
+        torso.add(spineSpike);
+      }
+
+      // Deep Jagged Branching Lightning-Shaped Toxic Lime-Green Chest Rift
+      const chestCavity = new THREE.Mesh(
+        makeFaceted(new THREE.OctahedronGeometry(0.16, 0), 0.02),
+        darkBarkMat
+      );
+      chestCavity.position.set(0, 0.38, 0.30);
+      chestCavity.scale.set(1.1, 1.85, 0.35);
+      torso.add(chestCavity);
+
+      const chestCrackMain = new THREE.Mesh(new THREE.OctahedronGeometry(0.12, 0), glowMat);
+      chestCrackMain.position.set(0, 0.38, 0.33);
+      chestCrackMain.scale.set(0.82, 1.78, 0.32);
+      torso.add(chestCrackMain);
+
+      const chestHotCore = new THREE.Mesh(new THREE.OctahedronGeometry(0.065, 0), hotCoreMat);
+      chestHotCore.position.set(0, 0.39, 0.345);
+      chestHotCore.scale.set(0.7, 1.5, 0.3);
+      torso.add(chestHotCore);
+
+      const lightningBranches = [
+        { x: 0.06, y: 0.45, w: 0.32, h: 0.04, rz: 0.42 },
+        { x: -0.05, y: 0.34, w: 0.28, h: 0.038, rz: -0.48 },
+        { x: 0.04, y: 0.26, w: 0.22, h: 0.032, rz: 0.32 }
+      ];
+      lightningBranches.forEach((b) => {
+        const bolt = new THREE.Mesh(new THREE.BoxGeometry(b.w, b.h, 0.055), glowMat);
+        bolt.position.set(b.x, b.y, 0.325);
+        bolt.rotation.z = b.rz;
+        torso.add(bolt);
+      });
+
+      // ONLY PointLight on the Boss (Light #4 in strict 4-light scene budget)
+      const chestLight = new THREE.PointLight(0x76ff03, 2.6, 18, 1.5);
+      chestLight.position.set(0, 0.40, 0.50);
+      torso.add(chestLight);
+
+      // Massive Spiked Shoulder Pauldrons Draped in Dark-Moss & Forest-Green Leaf Clusters
+      [-1, 1].forEach((side) => {
+        const pauldron = new THREE.Group();
+        pauldron.position.set(side * 0.56, 0.66, 0);
+        torso.add(pauldron);
+
+        const primaryHorn = new THREE.Mesh(
+          makeFaceted(new THREE.ConeGeometry(0.17, 0.62, 5), 0.035),
+          ridgeBarkMat
+        );
+        primaryHorn.rotation.z = -side * 0.78;
+        primaryHorn.position.set(side * 0.14, 0.12, 0);
+        pauldron.add(primaryHorn);
+
+        const secondarySpike = new THREE.Mesh(
+          makeFaceted(new THREE.ConeGeometry(0.11, 0.42, 4), 0.025),
+          darkBarkMat
+        );
+        secondarySpike.rotation.z = -side * 1.15;
+        secondarySpike.rotation.x = 0.28;
+        secondarySpike.position.set(side * 0.16, 0.02, 0.12);
+        pauldron.add(secondarySpike);
+
+        for (let l = 0; l < 6; l++) {
+          const leaf = new THREE.Mesh(
+            new THREE.ConeGeometry(0.14, 0.36, 3),
+            l % 2 === 0 ? mossMat : brightMossMat
+          );
+          leaf.scale.set(1.05, 1.0, 0.22);
+          leaf.position.set(
+            side * (0.05 + (l % 3) * 0.05),
+            -0.02 - l * 0.025,
+            (l - 2.5) * 0.075
+          );
+          leaf.rotation.z = -side * (0.55 + l * 0.14);
+          leaf.rotation.y = (l - 2.5) * 0.32;
+          pauldron.add(leaf);
+        }
+      });
+
+      // Sculpted Head, Furrowed Brows, Glowing Slanted Eyes, Jagged Fangs & Asymmetric Antler Crown
+      const headGroup = new THREE.Group();
+      headGroup.position.set(0, 0.82, 0.08);
+      torso.add(headGroup);
+
+      const cranium = new THREE.Mesh(
+        makeFaceted(new THREE.DodecahedronGeometry(0.25, 0), 0.035),
+        barkMat
+      );
+      cranium.scale.set(0.96, 1.28, 1.08);
+      headGroup.add(cranium);
+
+      const crownCrest = new THREE.Mesh(
+        makeFaceted(new THREE.ConeGeometry(0.14, 0.34, 4), 0.025),
+        ridgeBarkMat
+      );
+      crownCrest.position.set(0, 0.25, 0.05);
+      crownCrest.rotation.x = 0.25;
+      headGroup.add(crownCrest);
+
+      [-1, 1].forEach((side) => {
+        // Heavy Furrowed Brow Plate
+        const brow = new THREE.Mesh(
+          makeFaceted(new THREE.BoxGeometry(0.21, 0.065, 0.16), 0.018),
+          darkBarkMat
+        );
+        brow.position.set(side * 0.095, 0.085, 0.22);
+        brow.rotation.z = side * 0.38;
+        brow.rotation.y = -side * 0.26;
+        headGroup.add(brow);
+
+        // Recessed Glowing Toxic Lime-Green Eye + Bright Inner Core
+        const eye = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.036, 0.04), glowMat);
+        eye.position.set(side * 0.09, 0.036, 0.235);
+        eye.rotation.z = side * 0.36;
+        headGroup.add(eye);
+
+        const eyeCore = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.018, 0.045), hotCoreMat);
+        eyeCore.position.set(side * 0.085, 0.036, 0.24);
+        eyeCore.rotation.z = side * 0.36;
+        headGroup.add(eyeCore);
+
+        // Jagged Bark Cheek Mandible Tusks
+        const cheek = new THREE.Mesh(
+          makeFaceted(new THREE.ConeGeometry(0.068, 0.28, 4), 0.018),
+          ridgeBarkMat
+        );
+        cheek.position.set(side * 0.18, -0.09, 0.15);
+        cheek.rotation.z = side * 2.68;
+        headGroup.add(cheek);
+      });
+
+      // Glowing Green Throat Maw & Interlocking Upper/Lower Bark Fangs
+      const mouthGlow = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.18, 4), glowMat);
+      mouthGlow.position.set(0, -0.095, 0.215);
+      mouthGlow.rotation.x = Math.PI;
+      headGroup.add(mouthGlow);
+
+      for (let t = -2; t <= 2; t++) {
+        const upperTooth = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.065, 3), darkBarkMat);
+        upperTooth.position.set(t * 0.034, -0.048, 0.25);
+        upperTooth.rotation.x = Math.PI;
+        headGroup.add(upperTooth);
+
+        if (Math.abs(t) <= 1) {
+          const lowerTooth = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.055, 3), ridgeBarkMat);
+          lowerTooth.position.set(t * 0.042 + 0.015, -0.155, 0.242);
+          headGroup.add(lowerTooth);
+        }
+      }
+
+      // Tall Branching Twisted Antler Horns with Swaying Mossy Vine Tendrils
+      const vines = [];
+      [-1, 1].forEach((side) => {
+        const hornBase = new THREE.Group();
+        hornBase.position.set(side * 0.14, 0.23, -0.02);
+        hornBase.rotation.z = -side * (side === 1 ? 0.36 : 0.30);
+        hornBase.rotation.x = -0.16;
+        headGroup.add(hornBase);
+
+        const mainBranch = new THREE.Mesh(
+          makeFaceted(new THREE.CylinderGeometry(0.036, 0.082, 0.56, 5), 0.025),
+          barkMat
+        );
+        mainBranch.position.y = 0.26;
+        hornBase.add(mainBranch);
+
+        const upperCrownBranch = new THREE.Mesh(
+          makeFaceted(new THREE.CylinderGeometry(0.018, 0.04, 0.42, 5), 0.018),
+          ridgeBarkMat
+        );
+        upperCrownBranch.position.set(-side * 0.05, 0.64, 0.04);
+        upperCrownBranch.rotation.z = side * 0.28;
+        hornBase.add(upperCrownBranch);
+
+        const outerTine = new THREE.Mesh(
+          makeFaceted(new THREE.ConeGeometry(0.045, 0.40, 4), 0.018),
+          darkBarkMat
+        );
+        outerTine.position.set(side * 0.14, 0.40, 0.03);
+        outerTine.rotation.z = -side * 0.68;
+        hornBase.add(outerTine);
+
+        const innerTine = new THREE.Mesh(
+          makeFaceted(new THREE.ConeGeometry(0.034, 0.32, 4), 0.016),
+          barkMat
+        );
+        innerTine.position.set(-side * 0.08, 0.48, 0.06);
+        innerTine.rotation.z = side * 0.34;
+        hornBase.add(innerTine);
+
+        // Swaying Mossy Vine Tendrils hanging from antlers
+        for (let v = 0; v < 2; v++) {
+          const vinePivot = new THREE.Group();
+          vinePivot.position.set(side * (0.14 + v * 0.08), 0.36 - v * 0.08, 0.04);
+          hornBase.add(vinePivot);
+
+          const vineStrip = new THREE.Mesh(
+            new THREE.BoxGeometry(0.026, 0.36 + v * 0.12, 0.014),
+            v === 0 ? brightMossMat : mossMat
+          );
+          vineStrip.position.y = -(0.18 + v * 0.06);
+          vinePivot.add(vineStrip);
+          vines.push(vinePivot);
+        }
+      });
+
+      // Articulated Arms & Oversized Multi-Jointed Three-Fingered Claws
+      const arms = {};
+      [-1, 1].forEach((side) => {
+        const label = side === -1 ? 'left' : 'right';
+        const shoulder = new THREE.Group();
+        shoulder.position.set(side * 0.60, 0.54, 0);
+        torso.add(shoulder);
+
+        const upperArm = new THREE.Mesh(
+          makeFaceted(new THREE.CylinderGeometry(0.15, 0.12, 0.54, 6), 0.032),
+          barkMat
+        );
+        upperArm.position.set(side * 0.06, -0.25, 0);
+        upperArm.rotation.z = side * 0.18;
+        shoulder.add(upperArm);
+
+        // Jagged Elbow Spur
+        const elbowSpike = new THREE.Mesh(
+          makeFaceted(new THREE.ConeGeometry(0.08, 0.30, 4), 0.018),
+          darkBarkMat
+        );
+        elbowSpike.position.set(side * 0.18, -0.46, -0.09);
+        elbowSpike.rotation.z = -side * 0.92;
+        elbowSpike.rotation.x = -0.42;
+        shoulder.add(elbowSpike);
+
+        const forearm = new THREE.Group();
+        forearm.position.set(side * 0.12, -0.50, 0.04);
+        shoulder.add(forearm);
+
+        const forearmMesh = new THREE.Mesh(
+          makeFaceted(new THREE.CylinderGeometry(0.15, 0.18, 0.58, 6), 0.035),
+          ridgeBarkMat
+        );
+        forearmMesh.position.set(0, -0.27, 0.06);
+        forearmMesh.rotation.x = -0.22;
+        forearm.add(forearmMesh);
+
+        // Glowing green bark vein fissure on forearm
+        const armVein = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.28, 0.03), glowMat);
+        armVein.position.set(side * 0.08, -0.28, 0.14);
+        armVein.rotation.x = -0.22;
+        forearm.add(armVein);
+
+        // Mossy Wrist Cuff
+        const wristMoss = new THREE.Mesh(
+          makeFaceted(new THREE.DodecahedronGeometry(0.18, 0), 0.028),
+          mossMat
+        );
+        wristMoss.position.set(0, -0.48, 0.12);
+        wristMoss.scale.set(1.15, 0.65, 1.15);
+        forearm.add(wristMoss);
+
+        // Oversized Three-Fingered Clawed Hand (2 Front Talons + 1 Opposable Thumb Claw)
+        const hand = new THREE.Group();
+        hand.position.set(0, -0.58, 0.15);
+        forearm.add(hand);
+
+        const palm = new THREE.Mesh(
+          makeFaceted(new THREE.BoxGeometry(0.22, 0.22, 0.20), 0.028),
+          darkBarkMat
+        );
+        hand.add(palm);
+
+        const fingers = [];
+        const clawConfigs = [
+          { x: -side * 0.065, y: -0.10, z: 0.075, rz: -side * 0.24, rx: 0.42, scale: 1.08 },
+          { x: side * 0.065, y: -0.10, z: 0.065, rz: side * 0.22, rx: 0.40, scale: 1.0 },
+          { x: -side * 0.12, y: -0.05, z: -0.06, rz: -side * 0.68, rx: -0.28, scale: 0.88 }
+        ];
+        clawConfigs.forEach((cfg) => {
+          const fingerBase = new THREE.Group();
+          fingerBase.position.set(cfg.x, cfg.y, cfg.z);
+          fingerBase.rotation.set(cfg.rx, 0, cfg.rz);
+          fingerBase.scale.setScalar(cfg.scale);
+          hand.add(fingerBase);
+
+          const knuckle1 = new THREE.Mesh(
+            makeFaceted(new THREE.CylinderGeometry(0.046, 0.038, 0.18, 5), 0.012),
+            barkMat
+          );
+          knuckle1.position.y = -0.08;
+          fingerBase.add(knuckle1);
+
+          const midJoint = new THREE.Group();
+          midJoint.position.set(0, -0.16, 0.01);
+          midJoint.rotation.x = 0.36;
+          fingerBase.add(midJoint);
+
+          const talon = new THREE.Mesh(
+            makeFaceted(new THREE.ConeGeometry(0.042, 0.26, 4), 0.012),
+            darkBarkMat
+          );
+          talon.position.set(0, -0.12, 0.03);
+          talon.rotation.x = Math.PI + 0.35;
+          midJoint.add(talon);
+
+          fingers.push({ base: fingerBase, mid: midJoint, baseRx: cfg.rx });
+        });
+
+        arms[label] = { shoulder, forearm, hand, fingers };
+      });
+
+      // Trunk-Like Legs, Glowing Shin Fissures & 5-Toed Splayed Root Feet grounded at y = 0
+      const legs = {};
+      [-1, 1].forEach((side) => {
+        const label = side === -1 ? 'left' : 'right';
+        const hip = new THREE.Group();
+        hip.position.set(side * 0.25, -0.06, 0);
+        pelvis.add(hip);
+
+        const thigh = new THREE.Mesh(
+          makeFaceted(new THREE.CylinderGeometry(0.17, 0.15, 0.50, 6), 0.032),
+          barkMat
+        );
+        thigh.position.set(side * 0.04, -0.25, 0);
+        thigh.rotation.z = side * 0.1;
+        hip.add(thigh);
+
+        const knee = new THREE.Group();
+        knee.position.set(side * 0.06, -0.50, 0);
+        hip.add(knee);
+
+        // Spiked Knee Guard
+        const kneeSpike = new THREE.Mesh(
+          makeFaceted(new THREE.ConeGeometry(0.075, 0.22, 4), 0.015),
+          darkBarkMat
+        );
+        kneeSpike.position.set(0, -0.02, 0.16);
+        kneeSpike.rotation.x = 0.65;
+        knee.add(kneeSpike);
+
+        const shin = new THREE.Mesh(
+          makeFaceted(new THREE.CylinderGeometry(0.15, 0.26, 0.56, 7), 0.038),
+          ridgeBarkMat
+        );
+        shin.position.y = -0.28;
+        knee.add(shin);
+
+        // Vertical Glowing Lime-Green Shin Fissure + Hot Core
+        const shinGlow = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.38, 0.045), glowMat);
+        shinGlow.position.set(-side * 0.04, -0.26, 0.165);
+        shinGlow.rotation.z = side * 0.12;
+        knee.add(shinGlow);
+
+        const shinCore = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.30, 0.05), hotCoreMat);
+        shinCore.position.set(-side * 0.04, -0.26, 0.17);
+        shinCore.rotation.z = side * 0.12;
+        knee.add(shinCore);
+
+        // 5 Gnarled Splayed Buttress Root Toes per Foot planted solidly on y = 0
+        for (let r = 0; r < 5; r++) {
+          const rAngle = (r / 5) * Math.PI * 2 + 0.35;
+          const rootToe = new THREE.Mesh(
+            makeFaceted(new THREE.ConeGeometry(0.078, 0.38, 4), 0.018),
+            r % 2 === 0 ? darkBarkMat : barkMat
+          );
+          rootToe.position.set(Math.sin(rAngle) * 0.22, -0.51, Math.cos(rAngle) * 0.22);
+          rootToe.rotation.x = Math.cos(rAngle) * 1.18;
+          rootToe.rotation.z = -Math.sin(rAngle) * 1.18;
+          knee.add(rootToe);
+        }
+
+        legs[label] = { hip, knee };
+      });
+
+      // Lightweight Orbiting Toxic Green Spores
+      const sporeCount = 24;
+      const sporeGeo = new THREE.BufferGeometry();
+      const sporePositions = new Float32Array(sporeCount * 3);
+      const sporeSeeds = [];
+      for (let i = 0; i < sporeCount; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const rad = 0.45 + Math.random() * 0.85;
+        sporePositions[i * 3] = Math.cos(ang) * rad;
+        sporePositions[i * 3 + 1] = 0.4 + Math.random() * 2.2;
+        sporePositions[i * 3 + 2] = Math.sin(ang) * rad;
+        sporeSeeds.push({ ang, rad, speed: 0.5 + Math.random() * 0.7, yOffset: Math.random() * 6.28 });
+      }
+      sporeGeo.setAttribute('position', new THREE.BufferAttribute(sporePositions, 3));
+      const sporeMat = new THREE.PointsMaterial({
+        color: 0x76ff03,
+        size: 0.08,
+        transparent: true,
+        opacity: 0.88,
+        depthWrite: false
+      });
+      const spores = new THREE.Points(sporeGeo, sporeMat);
+      root.add(spores);
+
+      return {
+        mesh: root,
+        pelvis,
+        torso,
+        head: headGroup,
+        vines,
+        chestLight,
+        glowMat,
+        hotCoreMat,
+        arms,
+        legs,
+        spores,
+        sporeSeeds
+      };
+    }
+
+    // =========================================================================
+    // 4. SCENE, STRICT 4-LIGHT BUDGET, SKY DOME & QUALITY MANAGER
+    // =========================================================================
+    const isMobileDevice = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+      window.matchMedia('(pointer: coarse)').matches;
+
+    const QUALITY_PRESETS = {
+      LOW: { label: 'LOW', pixelRatioCap: 1.0, fogDensity: 0.044, camFar: 64, dustRatio: 0.35 },
+      MED: { label: 'MED', pixelRatioCap: 1.25, fogDensity: 0.038, camFar: 82, dustRatio: 0.65 },
+      HIGH: { label: 'HIGH', pixelRatioCap: 1.5, fogDensity: 0.034, camFar: 112, dustRatio: 1.0 }
+    };
+
+    const qualityState = {
+      mode: 'AUTO', // AUTO, LOW, MED, HIGH
+      activeTier: isMobileDevice ? 'MED' : 'HIGH',
+      fpsFrames: 0,
+      fpsTimer: 0,
+      currentFps: 60,
+      lowFpsStreak: 0
+    };
+
+    const WORLD_HALF = 76;
+    const TOTAL_RELICS = 5;
+    const EXIT_POS = new THREE.Vector3(0, 0, -72);
+
+    const ALTAR_DEFS = [
+      { name: 'Whispering Stones', x: -46, z: 34, color: 0x00f5d4 },
+      { name: 'The Sunken Hollow', x: 48, z: 24, color: 0xffd166 },
+      { name: 'Ritual Circle', x: -26, z: -12, color: 0x00f5d4 },
+      { name: 'Overgrown Ruin', x: 48, z: -32, color: 0xffd166 },
+      { name: 'Gnarled Shrine', x: -44, z: -52, color: 0x00f5d4 }
+    ];
+
+    const gameState = {
+      phase: 'TITLE', // TITLE, PLAYING, PAUSED, JUMPSCARE, CUTSCENE, GAMEOVER, VICTORY
+      elapsedTime: 0,
+      relicsCollected: 0,
+      gateUnlocked: false,
+      flashlightOn: true,
+      stamina: 100,
+      exhausted: false,
+      adrenaline: 0,
+      adrenalineRushActive: false,
+      adrenalineSurges: 0,
+      bossEscapes: 0,
+      wasTrackedLastFrame: false,
+      isCrouching: false,
+      isSprinting: false,
+      nearestAltar: null,
+      jumpscareTimer: 0,
+      cutsceneTimer: 0,
+      cutsceneSlam1Done: false,
+      cutsceneSlam2Done: false,
+      cutsceneSealLocked: false
+    };
+
+    const canvas = document.getElementById('game-canvas');
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: !isMobileDevice,
+      powerPreference: 'high-performance',
+      stencil: false
+    });
+    renderer.shadowMap.enabled = false;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+
+    const NIGHT_BG_COLOR = new THREE.Color(0x030508);
+    const DAWN_BG_COLOR = new THREE.Color(0x284361);
+
+    const scene = new THREE.Scene();
+    scene.background = NIGHT_BG_COLOR.clone();
+    scene.fog = new THREE.FogExp2(0x030508, QUALITY_PRESETS[qualityState.activeTier].fogDensity);
+
+    const BASE_FOV = 72;
+    const RUSH_FOV = 82;
+    const camera = new THREE.PerspectiveCamera(
+      BASE_FOV,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      QUALITY_PRESETS[qualityState.activeTier].camFar
+    );
+    camera.rotation.order = 'YXZ';
+    scene.add(camera);
+
+    // Abyssal Midnight Sky Dome, Slowly Drifting Storm-Cloud Dome & Cratered Eerie Moon
+    const skyTex = createSkyTexture();
+    const skyMat = new THREE.MeshBasicMaterial({ map: skyTex, color: 0xffffff, side: THREE.BackSide, fog: false });
+    const skyDome = new THREE.Mesh(new THREE.SphereGeometry(130, 24, 16), skyMat);
+    scene.add(skyDome);
+
+    const cloudTex = createCloudDomeTexture();
+    const cloudMat = new THREE.MeshBasicMaterial({
+      map: cloudTex,
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.84,
+      side: THREE.BackSide,
+      depthWrite: false,
+      fog: false
+    });
+    const cloudDome = new THREE.Mesh(new THREE.SphereGeometry(122, 24, 16), cloudMat);
+    scene.add(cloudDome);
+
+    const moonBasePos = new THREE.Vector3(22, 42, -96);
+    const moonTex = createEerieMoonTexture();
+    const moonMat = new THREE.MeshBasicMaterial({
+      map: moonTex,
+      transparent: true,
+      opacity: 0.92,
+      depthWrite: false,
+      fog: false
+    });
+    const moonMesh = new THREE.Mesh(new THREE.PlaneGeometry(26, 26), moonMat);
+    moonMesh.position.copy(moonBasePos);
+    moonMesh.lookAt(0, 0, 0);
+    scene.add(moonMesh);
+
+    // STRICT 4-LIGHT BUDGET:
+    // Light #1: Oppressive Cold Midnight HemisphereLight
+    const hemiLight = new THREE.HemisphereLight(0x182638, 0x040605, 0.32);
+    scene.add(hemiLight);
+
+    // Light #2: Dim Directional Moonlight (doubles as Dawn Horizon Light during Phase 3 Cutscene)
+    const moonLight = new THREE.DirectionalLight(0x4a6b94, 0.38);
+    moonLight.position.copy(moonBasePos);
+    scene.add(moonLight);
+
+    // Light #3: Realistic Player Flashlight SpotLight
+    const flashlight = new THREE.SpotLight(0xfff4dc, 3.8, 42, Math.PI / 5.4, 0.56, 1.1);
+    flashlight.position.set(0.18, -0.14, 0.05);
+    flashlight.target.position.set(0, -0.18, -10);
+    camera.add(flashlight);
+    camera.add(flashlight.target);
+
+    // Volumetric Flashlight Haze Cone
+    const coneTex = createVolumetricConeTexture();
+    const beamConeGeo = new THREE.CylinderGeometry(0.06, 2.4, 11, 14, 1, true);
+    beamConeGeo.translate(0, -5.5, 0);
+    beamConeGeo.rotateX(Math.PI / 2);
+    const beamConeMat = new THREE.MeshBasicMaterial({
+      map: coneTex,
+      transparent: true,
+      opacity: 0.32,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    const beamConeMesh = new THREE.Mesh(beamConeGeo, beamConeMat);
+    beamConeMesh.position.set(0.18, -0.14, -0.15);
+    camera.add(beamConeMesh);
+
+    // Atmospheric Floating Dust Motes
+    const MAX_DUST_COUNT = 220;
+    const dustGeo = new THREE.BufferGeometry();
+    const dustPositions = new Float32Array(MAX_DUST_COUNT * 3);
+    const dustVelocities = [];
+    for (let i = 0; i < MAX_DUST_COUNT; i++) {
+      dustPositions[i * 3] = (Math.random() - 0.5) * 40;
+      dustPositions[i * 3 + 1] = 0.2 + Math.random() * 6.0;
+      dustPositions[i * 3 + 2] = (Math.random() - 0.5) * 40;
+      dustVelocities.push({
+        vx: (Math.random() - 0.5) * 0.24,
+        vy: 0.04 + Math.random() * 0.11,
+        vz: (Math.random() - 0.5) * 0.24
+      });
+    }
+    dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+    const dustMat = new THREE.PointsMaterial({
+      color: 0xcbd5e1,
+      size: 0.055,
+      transparent: true,
+      opacity: 0.3,
+      depthWrite: false
+    });
+    const dustParticles = new THREE.Points(dustGeo, dustMat);
+    scene.add(dustParticles);
+
+    function applyQualityTier(tier) {
+      qualityState.activeTier = tier;
+      const cfg = QUALITY_PRESETS[tier];
+      const maxDpr = isMobileDevice ? Math.min(cfg.pixelRatioCap, 1.25) : cfg.pixelRatioCap;
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, maxDpr));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+
+      if (gameState.phase !== 'CUTSCENE' && gameState.phase !== 'VICTORY') {
+        scene.fog.density = cfg.fogDensity;
+        camera.far = cfg.camFar;
+        skyDome.scale.setScalar((cfg.camFar * 0.95) / 130);
+        cloudDome.scale.setScalar((cfg.camFar * 0.89) / 122);
+        const moonScale = cfg.camFar / 115;
+        moonMesh.position.copy(moonBasePos).multiplyScalar(moonScale);
+        moonMesh.scale.setScalar(moonScale);
+        camera.updateProjectionMatrix();
+      }
+      dustGeo.setDrawRange(0, Math.floor(MAX_DUST_COUNT * cfg.dustRatio));
+
+      const labelText = qualityState.mode === 'AUTO'
+        ? `QUALITY: AUTO (${tier})`
+        : `QUALITY: ${tier}`;
+      document.getElementById('title-quality-btn').textContent = labelText;
+      document.getElementById('pause-quality-btn').textContent = labelText;
+    }
+
+    function cycleQualityMode() {
+      const order = ['AUTO', 'LOW', 'MED', 'HIGH'];
+      const next = order[(order.indexOf(qualityState.mode) + 1) % order.length];
+      qualityState.mode = next;
+      qualityState.lowFpsStreak = 0;
+      if (next === 'AUTO') {
+        applyQualityTier(isMobileDevice ? 'MED' : 'HIGH');
+      } else {
+        applyQualityTier(next);
+      }
+    }
+
+    document.getElementById('title-quality-btn').addEventListener('click', cycleQualityMode);
+    document.getElementById('pause-quality-btn').addEventListener('click', cycleQualityMode);
+    applyQualityTier(qualityState.activeTier);
+
+    // =========================================================================
+    // 5. INSTANCED FOREST (4 GROUNDED TREE ARCHETYPES) & 2D SPATIAL HASH GRID
+    // =========================================================================
+    const colliders = []; // { x, z, r }
+    const spatialGrid = new Map();
+    const GRID_CELL_SIZE = 8.0;
+    const losVisitedCells = new Set(); // Pre-allocated Set cleared per LOS check (zero GC)
+
+    function addCollider(x, z, r) {
+      const idx = colliders.length;
+      colliders.push({ x, z, r });
+      const gx = Math.floor(x / GRID_CELL_SIZE);
+      const gz = Math.floor(z / GRID_CELL_SIZE);
+      const key = (gx + 32) * 64 + (gz + 32); // Numeric hash key (zero string allocations!)
+      if (!spatialGrid.has(key)) spatialGrid.set(key, []);
+      spatialGrid.get(key).push(idx);
+    }
+
+    const altars = [];
+    let exitGate = null;
+
+    let seed = 4219;
+    function rand() {
+      seed = (seed * 16807) % 2147483647;
+      return (seed - 1) / 2147483646;
+    }
+
+    const barkTextures = createBarkTextures();
+    const groundMap = createGroundTextures();
+    const shadowTex = createContactShadowTexture();
+    const pillarGradTex = createCyanGoldPillarTexture();
+    const runeCircleTex = createRuneCircleTexture();
+
+    const sharedTreeBarkMat = new THREE.MeshStandardMaterial({
+      map: barkTextures.map,
+      bumpMap: barkTextures.bumpMap,
+      bumpScale: 0.14,
+      roughness: 0.94,
+      metalness: 0.02
+    });
+
+    const sharedDeadCanopyMat = new THREE.MeshStandardMaterial({
+      color: 0x161d17,
+      roughness: 0.93,
+      metalness: 0.01,
+      flatShading: true
+    });
+
+    const sharedBoulderMat = new THREE.MeshStandardMaterial({
+      color: 0x242c2a,
+      roughness: 0.94,
+      flatShading: true
+    });
+
+    const contactShadowMat = new THREE.MeshBasicMaterial({
+      map: shadowTex,
+      transparent: true,
+      opacity: 0.85,
+      depthWrite: false
+    });
+
+    /**
+     * Generates a grounded multi-part horror tree archetype firmly rooted at y = 0:
+     * - Flared root buttresses arching from lower trunk into y = -0.25m below ground
+     * - Twisted multi-segment dark bark trunk
+     * - Crooked bare branches with secondary forked twigs
+     * - Sparse dead canopy clusters attached directly to branch tips & crown apex
+     * Returns { barkGeo, canopyGeo } ready for THREE.InstancedMesh.
+     */
+    function createTreeArchetypeGeometries(variantIndex, isBareSkeletal) {
+      const barkParts = [];
+      const canopyParts = [];
+
+      const baseRadius = 0.56 + variantIndex * 0.05;
+      const topRadius = baseRadius * 0.22;
+      const height = 11.2 + variantIndex * 1.1;
+      const bendPhase = variantIndex * 1.57;
+      const bendAmp = 0.42 + (variantIndex % 2) * 0.22;
+
+      // 1. Twisted Multi-Segment Dark Bark Trunk rooted at y = 0
+      const trunkGeo = new THREE.CylinderGeometry(topRadius, baseRadius, height, 8, 10);
+      trunkGeo.translate(0, height / 2, 0);
+      const pos = trunkGeo.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const vx = pos.getX(i);
+        const vy = pos.getY(i);
+        const vz = pos.getZ(i);
+        const t = Math.max(0, vy / height);
+
+        const flareScale = 1 + Math.exp(-vy * 1.7) * 0.46;
+        const twistX = Math.sin(t * Math.PI * 1.6 + bendPhase) * bendAmp * t;
+        const twistZ = Math.cos(t * Math.PI * 1.4 + bendPhase) * bendAmp * t;
+        const angle = Math.atan2(vz, vx);
+        const furrow = 1 + Math.sin(angle * 6 + vy * 1.5) * 0.08;
+
+        pos.setXYZ(i, vx * flareScale * furrow + twistX, vy, vz * flareScale * furrow + twistZ);
+      }
+      trunkGeo.computeVertexNormals();
+      barkParts.push(trunkGeo);
+
+      // 2. Flared Root Buttresses firmly anchored into y = 0
+      const rootCount = 6;
+      for (let r = 0; r < rootCount; r++) {
+        const rAng = (r / rootCount) * Math.PI * 2 + variantIndex * 0.3;
+        const rootLen = 2.1;
+        const rootGeo = new THREE.CylinderGeometry(baseRadius * 0.14, baseRadius * 0.36, rootLen, 5, 4);
+        const rPos = rootGeo.attributes.position;
+        for (let k = 0; k < rPos.count; k++) {
+          const rx = rPos.getX(k);
+          const ry = rPos.getY(k);
+          const rz = rPos.getZ(k);
+          const normT = 0.5 - ry / rootLen;
+          const archOut = Math.pow(normT, 1.35) * (0.95 + baseRadius * 0.75);
+          rPos.setXYZ(k, rx + archOut, ry, rz);
+        }
+        rootGeo.computeVertexNormals();
+        rootGeo.rotateZ(-0.16);
+        rootGeo.rotateY(-rAng);
+        rootGeo.translate(Math.cos(rAng) * (baseRadius * 0.52), 0.55, Math.sin(rAng) * (baseRadius * 0.52));
+        barkParts.push(rootGeo);
+      }
+
+      // 3. Crooked Bare Branches, Secondary Forked Twigs & Attached Dead Canopy Clusters
+      const limbCount = 5;
+      for (let b = 0; b < limbCount; b++) {
+        const bFrac = 0.54 + (b / limbCount) * 0.38;
+        const attachY = height * bFrac;
+        const crownX = Math.sin(bFrac * Math.PI * 1.6 + bendPhase) * bendAmp * bFrac;
+        const crownZ = Math.cos(bFrac * Math.PI * 1.4 + bendPhase) * bendAmp * bFrac;
+
+        const limbYaw = (b / limbCount) * Math.PI * 2 + variantIndex * 0.8;
+        const limbTilt = -(0.65 + (b % 3) * 0.14);
+        const limbLen = (2.8 + (b % 2) * 0.9) * (1.15 - bFrac * 0.32);
+        const limbBaseR = baseRadius * (0.27 - bFrac * 0.11);
+
+        const limbGeo = new THREE.CylinderGeometry(limbBaseR * 0.28, limbBaseR, limbLen, 5, 4);
+        limbGeo.translate(0, limbLen / 2, 0);
+        const lPos = limbGeo.attributes.position;
+        for (let k = 0; k < lPos.count; k++) {
+          const ly = lPos.getY(k);
+          lPos.setX(k, lPos.getX(k) + Math.sin(ly * 1.8) * 0.15);
+        }
+        limbGeo.computeVertexNormals();
+
+        const limbMat4 = new THREE.Matrix4()
+          .makeTranslation(crownX, attachY, crownZ)
+          .multiply(new THREE.Matrix4().makeRotationY(limbYaw))
+          .multiply(new THREE.Matrix4().makeRotationZ(limbTilt));
+
+        limbGeo.applyMatrix4(limbMat4);
+        barkParts.push(limbGeo);
+
+        // Secondary Crooked Forked Twig
+        const forkGeo = new THREE.CylinderGeometry(limbBaseR * 0.12, limbBaseR * 0.34, limbLen * 0.58, 4);
+        forkGeo.translate(0, limbLen * 0.29, 0);
+        forkGeo.rotateZ(0.55);
+        forkGeo.translate(0, limbLen * 0.56, 0);
+        forkGeo.applyMatrix4(limbMat4);
+        barkParts.push(forkGeo);
+
+        // Sparse Dead Canopy Cluster attached directly onto branch tip
+        if (!isBareSkeletal && b % 2 === 0) {
+          const cluster = makeFaceted(new THREE.DodecahedronGeometry(1.25, 1), 0.22, 0.56);
+          cluster.translate(0, limbLen * 0.94, 0);
+          cluster.applyMatrix4(limbMat4);
+          canopyParts.push(cluster);
+        }
+      }
+
+      // Sparse Dead Canopy Crown attached directly at trunk apex
+      if (!isBareSkeletal) {
+        const topX = Math.sin(Math.PI * 1.6 + bendPhase) * bendAmp;
+        const topZ = Math.cos(Math.PI * 1.4 + bendPhase) * bendAmp;
+        const apexCluster = makeFaceted(new THREE.DodecahedronGeometry(1.65, 1), 0.24, 0.65);
+        apexCluster.translate(topX, height, topZ);
+        canopyParts.push(apexCluster);
+      }
+
+      return {
+        barkGeo: mergeGeometries(barkParts),
+        canopyGeo: canopyParts.length > 0 ? mergeGeometries(canopyParts) : null
+      };
+    }
+
+    function buildForestEnvironment() {
+      // 1. Mossy Forest Floor firmly at y = 0
+      const groundGeo = new THREE.PlaneGeometry(220, 260, 16, 16);
+      groundGeo.rotateX(-Math.PI / 2);
+      const groundMat = new THREE.MeshStandardMaterial({
+        map: groundMap,
+        roughness: 0.96,
+        metalness: 0.02
+      });
+      const ground = new THREE.Mesh(groundGeo, groundMat);
+      ground.position.set(0, 0, -25);
+      scene.add(ground);
+
+      // Moonlit Clearing Stone Path beyond Northern Exit Gate (z = -72 to -118)
+      const pathGeo = new THREE.PlaneGeometry(6.4, 48);
+      pathGeo.rotateX(-Math.PI / 2);
+      const pathMat = new THREE.MeshStandardMaterial({
+        color: 0x262e34,
+        roughness: 0.9,
+        metalness: 0.04
+      });
+      const clearingPath = new THREE.Mesh(pathGeo, pathMat);
+      clearingPath.position.set(0, 0.012, -95);
+      scene.add(clearingPath);
+
+      // 2. Build 5 Ancient Stone Altars with Multi-Layered Cyan-Gold Auras (Zero Extra Scene Lights!)
+      ALTAR_DEFS.forEach((def, idx) => {
+        const altarPos = new THREE.Vector3(def.x, 0, def.z);
+        const altarGroup = new THREE.Group();
+        altarGroup.position.copy(altarPos);
+        scene.add(altarGroup);
+
+        const stoneMat = new THREE.MeshStandardMaterial({
+          color: 0x2a3338,
+          roughness: 0.88,
+          flatShading: true
+        });
+
+        const baseStep = new THREE.Mesh(
+          makeFaceted(new THREE.CylinderGeometry(1.55, 1.85, 0.32, 8), 0.04),
+          stoneMat
+        );
+        baseStep.position.y = 0.16;
+        altarGroup.add(baseStep);
+
+        const pedestal = new THREE.Mesh(
+          makeFaceted(new THREE.CylinderGeometry(0.56, 0.74, 1.08, 6), 0.03),
+          stoneMat
+        );
+        pedestal.position.y = 0.78;
+        altarGroup.add(pedestal);
+
+        for (let s = 0; s < 4; s++) {
+          const ang = (s / 4) * Math.PI * 2 + idx * 0.5;
+          const pillar = new THREE.Mesh(
+            makeFaceted(new THREE.BoxGeometry(0.42, 1.7 + (s % 2) * 0.65, 0.40), 0.04),
+            stoneMat
+          );
+          pillar.position.set(Math.cos(ang) * 3.25, 0.85, Math.sin(ang) * 3.25);
+          pillar.rotation.z = (s - 1.5) * 0.06;
+          pillar.rotation.y = ang;
+          altarGroup.add(pillar);
+        }
+
+        // Floating Forest Seal Relic Core + Dual Cyan & Gold Rune Rings
+        const relicMat = new THREE.MeshStandardMaterial({
+          color: 0xffd166,
+          emissive: def.color,
+          emissiveIntensity: 2.8,
+          roughness: 0.15,
+          flatShading: true
+        });
+        const coreMesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.32, 0), relicMat);
+        coreMesh.position.y = 1.78;
+        coreMesh.scale.set(0.88, 1.45, 0.88);
+        altarGroup.add(coreMesh);
+
+        const ring1 = new THREE.Mesh(
+          new THREE.TorusGeometry(0.54, 0.022, 6, 20),
+          new THREE.MeshBasicMaterial({ color: 0x00f5d4, transparent: true, opacity: 0.86, side: THREE.DoubleSide })
+        );
+        ring1.position.y = 1.78;
+        altarGroup.add(ring1);
+
+        const ring2 = new THREE.Mesh(
+          new THREE.TorusGeometry(0.68, 0.018, 6, 20),
+          new THREE.MeshBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.84, side: THREE.DoubleSide })
+        );
+        ring2.position.y = 1.78;
+        ring2.rotation.x = Math.PI / 3;
+        altarGroup.add(ring2);
+
+        // Tall 28m Vertical Cyan-Gold Spirit Light Pillar (Inner + Outer Additive Cylinders)
+        const pillarInner = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.18, 0.65, 28, 10, 1, true),
+          new THREE.MeshBasicMaterial({
+            map: pillarGradTex,
+            color: 0x00f5d4,
+            transparent: true,
+            opacity: 0.68,
+            blending: THREE.AdditiveBlending,
+            side: THREE.DoubleSide,
+            depthWrite: false
+          })
+        );
+        pillarInner.position.y = 14.0;
+        altarGroup.add(pillarInner);
+
+        const pillarOuter = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.65, 1.9, 26, 12, 1, true),
+          new THREE.MeshBasicMaterial({
+            map: pillarGradTex,
+            color: 0xffd166,
+            transparent: true,
+            opacity: 0.32,
+            blending: THREE.AdditiveBlending,
+            side: THREE.DoubleSide,
+            depthWrite: false
+          })
+        );
+        pillarOuter.position.y = 13.0;
+        altarGroup.add(pillarOuter);
+
+        // Pulsing Concentric Ground Rune Circle
+        const runeCircle = new THREE.Mesh(
+          new THREE.PlaneGeometry(6.8, 6.8),
+          new THREE.MeshBasicMaterial({
+            map: runeCircleTex,
+            transparent: true,
+            opacity: 0.82,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+          })
+        );
+        runeCircle.rotation.x = -Math.PI / 2;
+        runeCircle.position.y = 0.03;
+        altarGroup.add(runeCircle);
+
+        // Rising Spirit Wisps
+        const wispCount = 26;
+        const wispGeo = new THREE.BufferGeometry();
+        const wispPositions = new Float32Array(wispCount * 3);
+        const wispSeeds = [];
+        for (let w = 0; w < wispCount; w++) {
+          const ang = Math.random() * Math.PI * 2;
+          const rad = 0.4 + Math.random() * 2.4;
+          const wy = Math.random() * 14;
+          wispPositions[w * 3] = Math.cos(ang) * rad;
+          wispPositions[w * 3 + 1] = wy;
+          wispPositions[w * 3 + 2] = Math.sin(ang) * rad;
+          wispSeeds.push({ ang, rad, speed: 1.2 + Math.random() * 1.4, phase: Math.random() * 14 });
+        }
+        wispGeo.setAttribute('position', new THREE.BufferAttribute(wispPositions, 3));
+        const wisps = new THREE.Points(
+          wispGeo,
+          new THREE.PointsMaterial({
+            color: 0xffe8a3,
+            size: 0.15,
+            transparent: true,
+            opacity: 0.92,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+          })
+        );
+        altarGroup.add(wisps);
+
+        addCollider(def.x, def.z, 0.95);
+
+        altars.push({
+          id: idx,
+          name: def.name,
+          pos: altarPos,
+          mesh: altarGroup,
+          coreMesh,
+          ring1,
+          ring2,
+          pillarInner,
+          pillarOuter,
+          runeCircle,
+          wisps,
+          wispSeeds,
+          collected: false
+        });
+      });
+
+      // 3. Build Northern Exit Gate Structure
+      exitGate = buildExitGate();
+
+      // 4. Spatial Clearance Check
+      function isSafeSpawnSpot(x, z, minClearance) {
+        if (Math.hypot(x - 0, z - 62) < minClearance + 5.5) return false;
+        if (Math.hypot(x - EXIT_POS.x, z - EXIT_POS.z) < minClearance + 7.5) return false;
+        for (let i = 0; i < altars.length; i++) {
+          if (Math.hypot(x - altars[i].pos.x, z - altars[i].pos.z) < minClearance + 6.5) return false;
+        }
+        return true;
+      }
+
+      // 5. Collect Instance Transforms for 4 Tree Archetypes + 2 Boulder Archetypes + Contact Shadows
+      const treeTransforms = [[], [], [], []]; // 0,1 = foliage trees; 2,3 = bare skeletal trees
+      const boulderTransforms = [[], []];
+      const shadowTransforms = [];
+
+      function queueTreeInstance(x, z, scaleXZ, scaleY, yaw, typeIdx, registerCollider) {
+        treeTransforms[typeIdx].push({ x, z, scaleXZ, scaleY, yaw });
+        shadowTransforms.push({ x, z, radius: 2.3 * scaleXZ });
+        if (registerCollider) {
+          addCollider(x, z, 0.56 * scaleXZ);
+        }
+      }
+
+      // Perimeter Gnarled Tree Wall enclosing the 160x160 forest
+      for (let i = -78; i <= 78; i += 4.2) {
+        const sides = [
+          { x: i, z: -78 },
+          { x: i, z: 78 },
+          { x: -78, z: i },
+          { x: 78, z: i }
+        ];
+        sides.forEach((pt) => {
+          if (pt.z < -70 && Math.abs(pt.x) < 5.2) return;
+          const sx = 0.85 + rand() * 0.35;
+          const sy = 0.9 + rand() * 0.35;
+          queueTreeInstance(
+            pt.x + (rand() - 0.5) * 1.1,
+            pt.z + (rand() - 0.5) * 1.1,
+            sx,
+            sy,
+            rand() * Math.PI * 2,
+            Math.floor(rand() * 4),
+            false
+          );
+        });
+      }
+
+      // Flanking trees along the post-gate clearing path for cutscene depth
+      for (let cz = -82; cz >= -114; cz -= 7.0) {
+        queueTreeInstance(-7.8 - rand() * 3.0, cz, 0.9, 1.0, rand() * 6.28, 2, false);
+        queueTreeInstance(7.8 + rand() * 3.0, cz, 0.9, 1.0, rand() * 6.28, 3, false);
+      }
+
+      // Interior Forest Grounded Gnarled Trees (~98 trees)
+      let placedTrees = 0;
+      let attempts = 0;
+      while (placedTrees < 98 && attempts < 1800) {
+        attempts++;
+        const x = (rand() - 0.5) * 144;
+        const z = (rand() - 0.5) * 144;
+        if (!isSafeSpawnSpot(x, z, 2.2)) continue;
+
+        let tooClose = false;
+        for (let c = 0; c < colliders.length; c++) {
+          if (Math.hypot(x - colliders[c].x, z - colliders[c].z) < 5.2) {
+            tooClose = true;
+            break;
+          }
+        }
+        if (tooClose) continue;
+
+        const sx = 0.82 + rand() * 0.42;
+        const sy = 0.88 + rand() * 0.42;
+        const typeIdx = Math.floor(rand() * 4);
+        queueTreeInstance(x, z, sx, sy, rand() * Math.PI * 2, typeIdx, true);
+        placedTrees++;
+      }
+
+      // Interior Mossy Boulders (~54 boulders)
+      let placedRocks = 0;
+      attempts = 0;
+      while (placedRocks < 54 && attempts < 1200) {
+        attempts++;
+        const bx = (rand() - 0.5) * 140;
+        const bz = (rand() - 0.5) * 140;
+        if (!isSafeSpawnSpot(bx, bz, 2.0)) continue;
+
+        let tooClose = false;
+        for (let c = 0; c < colliders.length; c++) {
+          if (Math.hypot(bx - colliders[c].x, bz - colliders[c].z) < 3.4) {
+            tooClose = true;
+            break;
+          }
+        }
+        if (tooClose) continue;
+
+        const rad = 0.72 + rand() * 0.75;
+        const bType = placedRocks % 2;
+        boulderTransforms[bType].push({ x: bx, z: bz, rad, yaw: rand() * Math.PI * 2 });
+        shadowTransforms.push({ x: bx, z: bz, radius: rad * 1.45 });
+        addCollider(bx, bz, rad * 0.88);
+        placedRocks++;
+      }
+
+      // 6. Build InstancedMeshes (Entire Forest rendered in < 11 draw calls!)
+      const dummy = new THREE.Object3D();
+
+      for (let t = 0; t < 4; t++) {
+        const isBare = t >= 2;
+        const { barkGeo, canopyGeo } = createTreeArchetypeGeometries(t, isBare);
+        const list = treeTransforms[t];
+        if (list.length === 0) continue;
+
+        const barkInst = new THREE.InstancedMesh(barkGeo, sharedTreeBarkMat, list.length);
+        let canopyInst = null;
+        if (canopyGeo) {
+          canopyInst = new THREE.InstancedMesh(canopyGeo, sharedDeadCanopyMat, list.length);
+        }
+
+        for (let i = 0; i < list.length; i++) {
+          const item = list[i];
+          dummy.position.set(item.x, 0, item.z);
+          dummy.rotation.set(0, item.yaw, 0);
+          dummy.scale.set(item.scaleXZ, item.scaleY, item.scaleXZ);
+          dummy.updateMatrix();
+          barkInst.setMatrixAt(i, dummy.matrix);
+          if (canopyInst) {
+            canopyInst.setMatrixAt(i, dummy.matrix);
+          }
+        }
+        barkInst.instanceMatrix.needsUpdate = true;
+        scene.add(barkInst);
+        if (canopyInst) {
+          canopyInst.instanceMatrix.needsUpdate = true;
+          scene.add(canopyInst);
+        }
+      }
+
+      const boulderGeos = [
+        makeFaceted(new THREE.DodecahedronGeometry(1.0, 0), 0.09, 0.65),
+        makeFaceted(new THREE.IcosahedronGeometry(1.0, 0), 0.10, 0.58)
+      ];
+      for (let b = 0; b < 2; b++) {
+        const list = boulderTransforms[b];
+        if (list.length === 0) continue;
+        const rockInst = new THREE.InstancedMesh(boulderGeos[b], sharedBoulderMat, list.length);
+        for (let i = 0; i < list.length; i++) {
+          const item = list[i];
+          dummy.position.set(item.x, item.rad * 0.28, item.z);
+          dummy.rotation.set(0, item.yaw, 0);
+          dummy.scale.set(item.rad * 1.25, item.rad, item.rad * 1.05);
+          dummy.updateMatrix();
+          rockInst.setMatrixAt(i, dummy.matrix);
+        }
+        rockInst.instanceMatrix.needsUpdate = true;
+        scene.add(rockInst);
+      }
+
+      // Instanced Ground Contact-Shadow Discs (Zero GPU Shadow Map Cost!)
+      const shadowDiscGeo = new THREE.PlaneGeometry(1, 1);
+      shadowDiscGeo.rotateX(-Math.PI / 2);
+      const shadowInst = new THREE.InstancedMesh(shadowDiscGeo, contactShadowMat, shadowTransforms.length);
+      for (let i = 0; i < shadowTransforms.length; i++) {
+        const s = shadowTransforms[i];
+        dummy.position.set(s.x, 0.014, s.z);
+        dummy.rotation.set(0, 0, 0);
+        dummy.scale.set(s.radius * 2, 1, s.radius * 2);
+        dummy.updateMatrix();
+        shadowInst.setMatrixAt(i, dummy.matrix);
+      }
+      shadowInst.instanceMatrix.needsUpdate = true;
+      scene.add(shadowInst);
+    }
+
+    function buildExitGate() {
+      const gateGroup = new THREE.Group();
+      gateGroup.position.copy(EXIT_POS);
+      scene.add(gateGroup);
+
+      const stoneMat = new THREE.MeshStandardMaterial({
+        color: 0x263035,
+        roughness: 0.88,
+        flatShading: true
+      });
+
+      const runeMat = new THREE.MeshStandardMaterial({
+        color: 0xff1744,
+        emissive: 0xff1744,
+        emissiveIntensity: 2.3,
+        flatShading: true
+      });
+
+      // Twin Ancient Stone Monoliths with Glowing Rune Carvings
+      [-2.7, 2.7].forEach((px) => {
+        const pillar = new THREE.Mesh(
+          makeFaceted(new THREE.BoxGeometry(1.25, 5.8, 1.25), 0.06),
+          stoneMat
+        );
+        pillar.position.set(px, 2.9, 0);
+        gateGroup.add(pillar);
+        addCollider(EXIT_POS.x + px, EXIT_POS.z, 0.82);
+
+        [-0.64, 0.64].forEach((rz) => {
+          const runeStrip = new THREE.Mesh(new THREE.BoxGeometry(0.16, 4.2, 0.06), runeMat);
+          runeStrip.position.set(px, 2.8, rz);
+          gateGroup.add(runeStrip);
+        });
+      });
+
+      const lintel = new THREE.Mesh(
+        makeFaceted(new THREE.BoxGeometry(7.2, 1.15, 1.4), 0.06),
+        stoneMat
+      );
+      lintel.position.set(0, 5.9, 0);
+      gateGroup.add(lintel);
+
+      const wardBarsGroup = new THREE.Group();
+      gateGroup.add(wardBarsGroup);
+      const barMat = new THREE.MeshStandardMaterial({
+        color: 0x1e2428,
+        metalness: 0.75,
+        roughness: 0.35
+      });
+      for (let bx = -1.8; bx <= 1.8; bx += 0.6) {
+        const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 5.3, 6), barMat);
+        bar.position.set(bx, 2.65, 0);
+        wardBarsGroup.add(bar);
+      }
+
+      const sealMat = new THREE.MeshStandardMaterial({
+        color: 0xff1744,
+        emissive: 0xff1744,
+        emissiveIntensity: 1.9,
+        transparent: true,
+        opacity: 0.42,
+        side: THREE.DoubleSide
+      });
+      const sealPlane = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 5.2), sealMat);
+      sealPlane.position.set(0, 2.65, 0);
+      gateGroup.add(sealPlane);
+
+      const crownGem = new THREE.Mesh(new THREE.OctahedronGeometry(0.5, 0), runeMat);
+      crownGem.position.set(0, 6.85, 0);
+      gateGroup.add(crownGem);
+
+      // Twin Beacon Braziers
+      const brazierFireMat = new THREE.MeshStandardMaterial({
+        color: 0xff1744,
+        emissive: 0xff1744,
+        emissiveIntensity: 2.5,
+        flatShading: true
+      });
+      [-4.1, 4.1].forEach((bx) => {
+        const pedestal = new THREE.Mesh(
+          makeFaceted(new THREE.CylinderGeometry(0.45, 0.62, 1.35, 6), 0.04),
+          stoneMat
+        );
+        pedestal.position.set(bx, 0.675, 1.1);
+        gateGroup.add(pedestal);
+
+        const flame = new THREE.Mesh(new THREE.OctahedronGeometry(0.32, 0), brazierFireMat);
+        flame.position.set(bx, 1.58, 1.1);
+        flame.scale.set(0.9, 1.4, 0.9);
+        gateGroup.add(flame);
+      });
+
+      const beaconBeam = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.4, 1.6, 36, 10, 1, true),
+        new THREE.MeshBasicMaterial({
+          map: pillarGradTex,
+          color: 0xffd166,
+          transparent: true,
+          opacity: 0.58,
+          blending: THREE.AdditiveBlending,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        })
+      );
+      beaconBeam.position.set(0, 18, 0);
+      beaconBeam.visible = false;
+      gateGroup.add(beaconBeam);
+
+      // Cutscene Barrier Impact Sparks & Shockwave Ring Pool
+      const shockwaveRing = new THREE.Mesh(
+        new THREE.RingGeometry(0.2, 0.55, 24),
+        new THREE.MeshBasicMaterial({
+          color: 0x00f5d4,
+          transparent: true,
+          opacity: 0.0,
+          side: THREE.DoubleSide,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        })
+      );
+      shockwaveRing.position.set(0, 2.2, 0.15);
+      gateGroup.add(shockwaveRing);
+
+      const sparkCount = 44;
+      const sparkGeo = new THREE.BufferGeometry();
+      const sparkPos = new Float32Array(sparkCount * 3);
+      const sparkVel = [];
+      for (let i = 0; i < sparkCount; i++) {
+        sparkPos[i * 3] = 0;
+        sparkPos[i * 3 + 1] = -20;
+        sparkPos[i * 3 + 2] = 0;
+        sparkVel.push(new THREE.Vector3());
+      }
+      sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3));
+      const sparkMat = new THREE.PointsMaterial({
+        color: 0xffd166,
+        size: 0.18,
+        transparent: true,
+        opacity: 0.0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+      const sparks = new THREE.Points(sparkGeo, sparkMat);
+      gateGroup.add(sparks);
+
+      return {
+        group: gateGroup,
+        runeMat,
+        brazierFireMat,
+        wardBarsGroup,
+        sealMat,
+        sealPlane,
+        crownGem,
+        beaconBeam,
+        shockwaveRing,
+        sparks,
+        sparkVel,
+        shockwaveLife: 0
+      };
+    }
+
+    function triggerGateBarrierImpact(impactY = 2.1) {
+      sound.playBarrierSlam();
+      exitGate.shockwaveLife = 1.0;
+      exitGate.shockwaveRing.position.set(0, impactY, 0.25);
+      exitGate.shockwaveRing.scale.set(0.4, 0.4, 1);
+      exitGate.shockwaveRing.material.opacity = 0.95;
+
+      const arr = exitGate.sparks.geometry.attributes.position.array;
+      for (let i = 0; i < exitGate.sparkVel.length; i++) {
+        arr[i * 3] = (Math.random() - 0.5) * 1.4;
+        arr[i * 3 + 1] = impactY + (Math.random() - 0.5) * 0.8;
+        arr[i * 3 + 2] = 0.2;
+        const ang = Math.random() * Math.PI * 2;
+        const spd = 2.5 + Math.random() * 6.5;
+        exitGate.sparkVel[i].set(
+          Math.cos(ang) * spd,
+          Math.sin(ang) * spd + 1.5,
+          1.2 + Math.random() * 4.5
+        );
+      }
+      exitGate.sparks.geometry.attributes.position.needsUpdate = true;
+      exitGate.sparks.material.opacity = 1.0;
+    }
+
+    buildForestEnvironment();
+
+    // =========================================================================
+    // 6. PLAYER CONTROLLER & INPUT HANDLING (PC + Mobile Touch Controls)
+    // =========================================================================
+    const player = {
+      pos: new THREE.Vector3(0, 1.68, 62),
+      eyeOffset: 1.68,
+      vel: new THREE.Vector3(),
+      yaw: 0,
+      pitch: 0,
+      radius: 0.48,
+      bobTimer: 0
+    };
+
+    const keys = {};
+    let isPointerLocked = false;
+    let isDraggingLook = false;
+    let lastPointerX = 0;
+    let lastPointerY = 0;
+
+    const joystick = { active: false, id: null, dx: 0, dy: 0 };
+
+    window.addEventListener('keydown', (e) => {
+      keys[e.code] = true;
+
+      if (gameState.phase === 'PLAYING') {
+        if (e.code === 'KeyF') {
+          toggleFlashlight();
+        } else if (e.code === 'KeyC' || e.code === 'ControlLeft' || e.code === 'ControlRight') {
+          gameState.isCrouching = !gameState.isCrouching;
+        } else if (e.code === 'KeyE') {
+          handleInteractAction();
+        } else if (e.code === 'KeyM') {
+          handleMuteToggle();
+        } else if (e.code === 'KeyP') {
+          pauseGame();
+        }
+      } else if (gameState.phase === 'PAUSED' && (e.code === 'KeyP' || e.code === 'Escape')) {
+        resumeGame();
+      } else if (gameState.phase === 'CUTSCENE' && (e.code === 'Space' || e.code === 'Escape' || e.code === 'Enter')) {
+        skipEscapeCutscene();
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      keys[e.code] = false;
+    });
+
+    canvas.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+    });
+
+    document.addEventListener('pointerlockchange', () => {
+      isPointerLocked = document.pointerLockElement === canvas;
+    });
+
+    canvas.addEventListener('mousedown', (e) => {
+      if (gameState.phase !== 'PLAYING') return;
+      if (e.button === 2) {
+        toggleFlashlight();
+        return;
+      }
+      if (e.button === 0 && (gameState.nearestAltar ||
+          (gameState.gateUnlocked && Math.hypot(player.pos.x - EXIT_POS.x, player.pos.z - EXIT_POS.z) < 4.8))) {
+        handleInteractAction();
+      }
+      if (!isPointerLocked && canvas.requestPointerLock) {
+        try {
+          canvas.requestPointerLock();
+        } catch (err) {}
+      }
+      isDraggingLook = true;
+      lastPointerX = e.clientX;
+      lastPointerY = e.clientY;
+    });
+
+    window.addEventListener('mouseup', () => {
+      isDraggingLook = false;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (gameState.phase !== 'PLAYING') return;
+      const sensitivity = 0.0023;
+      if (isPointerLocked) {
+        player.yaw -= e.movementX * sensitivity;
+        player.pitch -= e.movementY * sensitivity;
+      } else if (isDraggingLook) {
+        const dx = e.clientX - lastPointerX;
+        const dy = e.clientY - lastPointerY;
+        lastPointerX = e.clientX;
+        lastPointerY = e.clientY;
+        player.yaw -= dx * sensitivity * 1.4;
+        player.pitch -= dy * sensitivity * 1.4;
+      }
+      player.pitch = Math.max(-1.38, Math.min(1.38, player.pitch));
+    });
+
+    // Touch Look on Canvas
+    let lookTouchId = null;
+    canvas.addEventListener('touchstart', (e) => {
+      if (gameState.phase !== 'PLAYING') return;
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        if (lookTouchId === null && t.identifier !== joystick.id) {
+          lookTouchId = t.identifier;
+          lastPointerX = t.clientX;
+          lastPointerY = t.clientY;
+        }
+      }
+    }, { passive: true });
+
+    canvas.addEventListener('touchmove', (e) => {
+      if (gameState.phase !== 'PLAYING') return;
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        if (t.identifier === lookTouchId) {
+          const dx = t.clientX - lastPointerX;
+          const dy = t.clientY - lastPointerY;
+          lastPointerX = t.clientX;
+          lastPointerY = t.clientY;
+          player.yaw -= dx * 0.0046;
+          player.pitch = Math.max(-1.38, Math.min(1.38, player.pitch - dy * 0.0046));
+        }
+      }
+    }, { passive: true });
+
+    canvas.addEventListener('touchend', (e) => {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === lookTouchId) {
+          lookTouchId = null;
+        }
+      }
+    });
+
+    // Mobile Virtual Joystick & Buttons
+    const joyZone = document.getElementById('joystick-zone');
+    const joyKnob = document.getElementById('joystick-knob');
+
+    joyZone.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      const t = e.changedTouches[0];
+      joystick.active = true;
+      joystick.id = t.identifier;
+      updateJoystick(t.clientX, t.clientY);
+    }, { passive: false });
+
+    joyZone.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        if (t.identifier === joystick.id) {
+          updateJoystick(t.clientX, t.clientY);
+        }
+      }
+    }, { passive: false });
+
+    const endJoystick = (e) => {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === joystick.id) {
+          joystick.active = false;
+          joystick.id = null;
+          joystick.dx = 0;
+          joystick.dy = 0;
+          joyKnob.style.transform = 'translate(0px, 0px)';
+        }
+      }
+    };
+    joyZone.addEventListener('touchend', endJoystick);
+    joyZone.addEventListener('touchcancel', endJoystick);
+
+    function updateJoystick(clientX, clientY) {
+      const rect = joyZone.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const maxR = rect.width * 0.38;
+      let dx = clientX - cx;
+      let dy = clientY - cy;
+      const dist = Math.hypot(dx, dy);
+      if (dist > maxR) {
+        dx = (dx / dist) * maxR;
+        dy = (dy / dist) * maxR;
+      }
+      joyKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+      joystick.dx = dx / maxR;
+      joystick.dy = dy / maxR;
+    }
+
+    document.getElementById('btn-touch-light').addEventListener('click', () => {
+      if (gameState.phase === 'PLAYING') toggleFlashlight();
+    });
+    document.getElementById('btn-touch-interact').addEventListener('click', () => {
+      if (gameState.phase === 'PLAYING') handleInteractAction();
+    });
+    document.getElementById('btn-touch-crouch').addEventListener('click', (e) => {
+      if (gameState.phase === 'PLAYING') {
+        gameState.isCrouching = !gameState.isCrouching;
+        e.currentTarget.classList.toggle('pressed', gameState.isCrouching);
+      }
+    });
+    const touchRunBtn = document.getElementById('btn-touch-sprint');
+    touchRunBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      keys['ShiftLeft'] = true;
+      touchRunBtn.classList.add('pressed');
+    });
+    touchRunBtn.addEventListener('touchend', () => {
+      keys['ShiftLeft'] = false;
+      touchRunBtn.classList.remove('pressed');
+    });
+
+    document.getElementById('touch-toggle-btn').addEventListener('click', () => {
+      document.getElementById('touch-controls').classList.toggle('force-visible');
+    });
+
+    function toggleFlashlight() {
+      gameState.flashlightOn = !gameState.flashlightOn;
+      flashlight.visible = gameState.flashlightOn;
+      beamConeMesh.visible = gameState.flashlightOn;
+      sound.playFlashlightClick(gameState.flashlightOn);
+
+      const ind = document.getElementById('light-indicator');
+      const txt = document.getElementById('light-status-text');
+      if (gameState.flashlightOn) {
+        ind.classList.remove('off');
+        txt.textContent = 'ON';
+      } else {
+        ind.classList.add('off');
+        txt.textContent = 'OFF';
+      }
+    }
+
+    // Spatial Hash Grid Collision Resolution (tests only nearby cells)
+    function resolveCollisions(pos, radius) {
+      pos.x = Math.max(-WORLD_HALF, Math.min(WORLD_HALF, pos.x));
+      pos.z = Math.max(-WORLD_HALF, Math.min(WORLD_HALF, pos.z));
+
+      const gx = Math.floor(pos.x / GRID_CELL_SIZE);
+      const gz = Math.floor(pos.z / GRID_CELL_SIZE);
+
+      for (let ox = -1; ox <= 1; ox++) {
+        for (let oz = -1; oz <= 1; oz++) {
+          const key = (gx + ox + 32) * 64 + (gz + oz + 32);
+          const cell = spatialGrid.get(key);
+          if (!cell) continue;
+          for (let j = 0; j < cell.length; j++) {
+            const c = colliders[cell[j]];
+            const dx = pos.x - c.x;
+            const dz = pos.z - c.z;
+            const distSq = dx * dx + dz * dz;
+            const minDist = radius + c.r;
+            if (distSq < minDist * minDist && distSq > 0.00001) {
+              const dist = Math.sqrt(distSq);
+              const overlap = minDist - dist;
+              pos.x += (dx / dist) * overlap;
+              pos.z += (dz / dist) * overlap;
+            }
+          }
+        }
+      }
+    }
+
+    // =========================================================================
+    // 7. TREE DEMON BOSS AI & ADRENALINE SURGE SYSTEM
+    // =========================================================================
+    const demonModel = createTreeDemon();
+    scene.add(demonModel.mesh);
+
+    // Soft contact shadow disc directly beneath the Tree Demon
+    const demonShadowDisc = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.6, 2.6).rotateX(-Math.PI / 2),
+      contactShadowMat
+    );
+    demonShadowDisc.position.y = 0.016;
+    scene.add(demonShadowDisc);
+
+    const demonAI = {
+      pos: new THREE.Vector3(14, 0, -26),
+      yaw: 0,
+      radius: 0.72,
+      state: 'PATROL', // PATROL, INVESTIGATE, TRACKING, SEARCH
+      targetPos: new THREE.Vector3(-26, 0, -12),
+      stateTimer: 0,
+      walkCycle: 0,
+      lastStepSide: 0,
+      roarCooldown: 0,
+      roarPoseTimer: 0
+    };
+
+    const patrolWaypoints = [
+      new THREE.Vector3(-44, 0, 30),
+      new THREE.Vector3(44, 0, 22),
+      new THREE.Vector3(0, 0, 6),
+      new THREE.Vector3(-28, 0, -14),
+      new THREE.Vector3(44, 0, -30),
+      new THREE.Vector3(-40, 0, -48),
+      new THREE.Vector3(0, 0, -56)
+    ];
+
+    function pickNextPatrolTarget() {
+      const biasChance = 0.25 + gameState.relicsCollected * 0.1;
+      if (Math.random() < biasChance) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 24 + Math.random() * 18;
+        const tx = Math.max(-68, Math.min(68, player.pos.x + Math.cos(angle) * dist));
+        const tz = Math.max(-68, Math.min(68, player.pos.z + Math.sin(angle) * dist));
+        demonAI.targetPos.set(tx, 0, tz);
+      } else {
+        const wp = patrolWaypoints[Math.floor(Math.random() * patrolWaypoints.length)];
+        demonAI.targetPos.copy(wp);
+      }
+    }
+
+    function hasLineOfSight(fromPos, toPos) {
+      const dx = toPos.x - fromPos.x;
+      const dz = toPos.z - fromPos.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist < 0.1) return true;
+      const dirX = dx / dist;
+      const dirZ = dz / dist;
+
+      losVisitedCells.clear();
+      const steps = Math.ceil(dist / (GRID_CELL_SIZE * 0.75));
+      for (let s = 0; s <= steps; s++) {
+        const t = (s / steps) * dist;
+        const sx = fromPos.x + dirX * t;
+        const sz = fromPos.z + dirZ * t;
+        const gx = Math.floor(sx / GRID_CELL_SIZE);
+        const gz = Math.floor(sz / GRID_CELL_SIZE);
+        const key = (gx + 32) * 64 + (gz + 32);
+        if (losVisitedCells.has(key)) continue;
+        losVisitedCells.add(key);
+
+        const cell = spatialGrid.get(key);
+        if (!cell) continue;
+        for (let j = 0; j < cell.length; j++) {
+          const c = colliders[cell[j]];
+          const toCx = c.x - fromPos.x;
+          const toCz = c.z - fromPos.z;
+          const proj = toCx * dirX + toCz * dirZ;
+          if (proj > 0 && proj < dist) {
+            const perpSq = (toCx * toCx + toCz * toCz) - proj * proj;
+            if (perpSq < (c.r * 0.85) * (c.r * 0.85)) {
+              return false;
+            }
+          }
+        }
+      }
+      return true;
+    }
+
+    function updateTreeDemon(dt, elapsed) {
+      demonAI.roarCooldown = Math.max(0, demonAI.roarCooldown - dt);
+      demonAI.roarPoseTimer = Math.max(0, demonAI.roarPoseTimer - dt);
+
+      const toPlayerX = player.pos.x - demonAI.pos.x;
+      const toPlayerZ = player.pos.z - demonAI.pos.z;
+      const distToPlayer = Math.hypot(toPlayerX, toPlayerZ);
+
+      const visionRange = gameState.flashlightOn ? 27.5 : (gameState.isCrouching ? 7.5 : 13.5);
+      const hearingRange = gameState.isSprinting ? 19.0 : (gameState.isCrouching ? 3.4 : 8.0);
+
+      const angleToPlayer = Math.atan2(toPlayerX, toPlayerZ);
+      let angleDiff = angleToPlayer - demonAI.yaw;
+      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+
+      const inVisionCone = Math.abs(angleDiff) < 1.15;
+      const clearLOS = distToPlayer < visionRange && hasLineOfSight(demonAI.pos, player.pos);
+      const spotted = (inVisionCone && clearLOS) || (distToPlayer < hearingRange && clearLOS);
+
+      if (spotted) {
+        if (demonAI.state !== 'TRACKING') {
+          demonAI.state = 'TRACKING';
+          demonAI.roarPoseTimer = 0.85;
+          if (demonAI.roarCooldown <= 0) {
+            sound.playDemonRoar();
+            demonAI.roarCooldown = 8.5;
+            showBanner('THE TREE DEMON IS TRACKING YOU — ADRENALINE SURGE!');
+          }
+        }
+        demonAI.targetPos.copy(player.pos);
+        demonAI.stateTimer = 4.2;
+      } else if (demonAI.state === 'TRACKING') {
+        demonAI.stateTimer -= dt;
+        if (demonAI.stateTimer <= 0) {
+          demonAI.state = 'SEARCH';
+          demonAI.stateTimer = 4.5;
+          gameState.bossEscapes++;
+        }
+      } else if (demonAI.state === 'SEARCH' || demonAI.state === 'INVESTIGATE') {
+        demonAI.stateTimer -= dt;
+        if (demonAI.stateTimer <= 0) {
+          demonAI.state = 'PATROL';
+          pickNextPatrolTarget();
+        }
+      }
+
+      // Adrenaline System when Boss Tracks Player
+      const isActivelyTracking = demonAI.state === 'TRACKING';
+      if (isActivelyTracking) {
+        const closePanicBonus = distToPlayer < 12 ? 22 : 0;
+        gameState.adrenaline = Math.min(100, gameState.adrenaline + (38 + closePanicBonus) * dt);
+      } else {
+        gameState.adrenaline = Math.max(0, gameState.adrenaline - 9.5 * dt);
+      }
+
+      const wasRushing = gameState.adrenalineRushActive;
+      gameState.adrenalineRushActive = isActivelyTracking || gameState.adrenaline > 40;
+
+      if (gameState.adrenalineRushActive && !wasRushing) {
+        gameState.adrenalineSurges++;
+        sound.playAdrenalineSurgeStinger();
+        if (!gameState.exhausted) {
+          gameState.stamina = Math.min(100, gameState.stamina + 25);
+        }
+      }
+      gameState.wasTrackedLastFrame = isActivelyTracking;
+
+      // Slower, Heavy Tree Demon Speeds: Patrol 2.3 m/s, Investigate/Search 2.9 m/s, Chase 4.2 m/s
+      let moveSpeed = 2.3;
+      if (demonAI.state === 'TRACKING') {
+        moveSpeed = 4.2;
+      } else if (demonAI.state === 'INVESTIGATE' || demonAI.state === 'SEARCH') {
+        moveSpeed = 2.9;
+      }
+
+      const prevX = demonAI.pos.x;
+      const prevZ = demonAI.pos.z;
+
+      const dx = demonAI.targetPos.x - demonAI.pos.x;
+      const dz = demonAI.targetPos.z - demonAI.pos.z;
+      const distToTarget = Math.hypot(dx, dz);
+
+      if (distToTarget < 1.6 && demonAI.state === 'PATROL') {
+        pickNextPatrolTarget();
+      } else if (distToTarget > 0.2) {
+        let dirX = dx / distToTarget;
+        let dirZ = dz / distToTarget;
+
+        // Soft repulsive steering using spatial grid
+        const gx = Math.floor(demonAI.pos.x / GRID_CELL_SIZE);
+        const gz = Math.floor(demonAI.pos.z / GRID_CELL_SIZE);
+        for (let ox = -1; ox <= 1; ox++) {
+          for (let oz = -1; oz <= 1; oz++) {
+            const key = (gx + ox + 32) * 64 + (gz + oz + 32);
+            const cell = spatialGrid.get(key);
+            if (!cell) continue;
+            for (let j = 0; j < cell.length; j++) {
+              const c = colliders[cell[j]];
+              const cdx = demonAI.pos.x - c.x;
+              const cdz = demonAI.pos.z - c.z;
+              const cDist = Math.hypot(cdx, cdz);
+              const avoidDist = c.r + demonAI.radius + 1.35;
+              if (cDist < avoidDist && cDist > 0.01) {
+                const push = (avoidDist - cDist) / avoidDist;
+                dirX += (cdx / cDist) * push * 1.45;
+                dirZ += (cdz / cDist) * push * 1.45;
+              }
+            }
+          }
+        }
+
+        const norm = Math.hypot(dirX, dirZ) || 1;
+        dirX /= norm;
+        dirZ /= norm;
+
+        const desiredYaw = Math.atan2(dirX, dirZ);
+        let yawDelta = desiredYaw - demonAI.yaw;
+        while (yawDelta > Math.PI) yawDelta -= Math.PI * 2;
+        while (yawDelta < -Math.PI) yawDelta += Math.PI * 2;
+        demonAI.yaw += yawDelta * Math.min(1, dt * 5.2);
+
+        demonAI.pos.x += Math.sin(demonAI.yaw) * moveSpeed * dt;
+        demonAI.pos.z += Math.cos(demonAI.yaw) * moveSpeed * dt;
+        resolveCollisions(demonAI.pos, demonAI.radius);
+      }
+
+      // Firmly grounded at y = 0
+      demonAI.pos.y = 0;
+      demonModel.mesh.position.copy(demonAI.pos);
+      demonModel.mesh.rotation.y = demonAI.yaw;
+      demonShadowDisc.position.set(demonAI.pos.x, 0.016, demonAI.pos.z);
+
+      // Heavy Stomping & Articulated Claw/Vine Animation
+      const stepDist = Math.hypot(demonAI.pos.x - prevX, demonAI.pos.z - prevZ);
+      demonAI.walkCycle += stepDist * 2.35;
+      const swing = Math.sin(demonAI.walkCycle);
+      const stompBounce = Math.abs(Math.cos(demonAI.walkCycle));
+
+      const currentSide = swing >= 0 ? 1 : -1;
+      if (currentSide !== demonAI.lastStepSide && stepDist > 0.001) {
+        demonAI.lastStepSide = currentSide;
+        sound.playDemonStomp(distToPlayer);
+      }
+
+      demonModel.pelvis.position.y = 1.09 + stompBounce * 0.10;
+      demonModel.pelvis.rotation.z = swing * 0.07;
+
+      const roarBlend = Math.min(1, demonAI.roarPoseTimer * 2.2);
+      const targetHunch = roarBlend > 0.1 ? -0.18 : (demonAI.state === 'TRACKING' ? 0.30 : 0.10);
+      demonModel.torso.rotation.x += (targetHunch - demonModel.torso.rotation.x) * Math.min(1, dt * 6);
+      demonModel.torso.rotation.y = -swing * 0.15;
+
+      if (demonAI.state === 'TRACKING' || demonAI.state === 'SEARCH') {
+        demonModel.head.rotation.y = Math.max(-0.55, Math.min(0.55, angleDiff * 0.6));
+        demonModel.head.rotation.x = -0.16 - roarBlend * 0.25 + Math.sin(elapsed * 4.2) * 0.05;
+      } else {
+        demonModel.head.rotation.y = Math.sin(elapsed * 0.9) * 0.35;
+        demonModel.head.rotation.x = 0.05;
+      }
+
+      // Swaying mossy antler vines
+      for (let v = 0; v < demonModel.vines.length; v++) {
+        demonModel.vines[v].rotation.z = Math.sin(elapsed * 2.6 + v * 1.3) * 0.16 + swing * 0.12;
+        demonModel.vines[v].rotation.x = Math.cos(elapsed * 2.1 + v) * 0.12;
+      }
+
+      // Articulated Arms & Three-Fingered Claws
+      const armAmp = demonAI.state === 'TRACKING' ? 0.62 : 0.36;
+      demonModel.arms.left.shoulder.rotation.x = -0.25 + swing * armAmp - roarBlend * 0.85;
+      demonModel.arms.right.shoulder.rotation.x = -0.25 - swing * armAmp - roarBlend * 0.85;
+      demonModel.arms.left.shoulder.rotation.z = -0.14 - stompBounce * 0.06 - roarBlend * 0.55;
+      demonModel.arms.right.shoulder.rotation.z = 0.14 + stompBounce * 0.06 + roarBlend * 0.55;
+
+      // Dynamic claw flexion
+      const clawCurl = (demonAI.state === 'TRACKING' ? 0.22 : 0.05) + Math.sin(elapsed * 5.0) * 0.12;
+      ['left', 'right'].forEach((sideKey) => {
+        const fList = demonModel.arms[sideKey].fingers;
+        for (let f = 0; f < fList.length; f++) {
+          fList[f].base.rotation.x = fList[f].baseRx + clawCurl;
+          fList[f].mid.rotation.x = 0.36 + clawCurl * 1.2;
+        }
+      });
+
+      const legAmp = demonAI.state === 'TRACKING' ? 0.58 : 0.44;
+      demonModel.legs.left.hip.rotation.x = -swing * legAmp;
+      demonModel.legs.right.hip.rotation.x = swing * legAmp;
+      demonModel.legs.left.knee.rotation.x = Math.max(0, swing * 0.42);
+      demonModel.legs.right.knee.rotation.x = Math.max(0, -swing * 0.42);
+
+      // Flare toxic lime-green eyes, shin cracks & chest rift when tracking
+      const baseGlow = demonAI.state === 'TRACKING' ? 3.3 : 2.2;
+      const pulse = Math.sin(elapsed * 6.5) * 0.5;
+      demonModel.glowMat.emissiveIntensity = baseGlow + pulse;
+      demonModel.hotCoreMat.emissiveIntensity = baseGlow + 0.8 + pulse;
+      demonModel.chestLight.intensity = baseGlow + Math.sin(elapsed * 5.8) * 0.6;
+
+      // Orbiting green spores
+      const sporeArr = demonModel.spores.geometry.attributes.position.array;
+      for (let i = 0; i < demonModel.sporeSeeds.length; i++) {
+        const s = demonModel.sporeSeeds[i];
+        const a = s.ang + elapsed * s.speed;
+        sporeArr[i * 3] = Math.cos(a) * s.rad;
+        sporeArr[i * 3 + 1] = 0.4 + ((elapsed * 0.42 + s.yOffset) % 2.1);
+        sporeArr[i * 3 + 2] = Math.sin(a) * s.rad;
+      }
+      demonModel.spores.geometry.attributes.position.needsUpdate = true;
+
+      // Audio & Crimson-Amber Heartbeat Vignette Feedback
+      const proximity = Math.max(0, Math.min(1, 1 - (distToPlayer - 2.2) / 24));
+      const adrenalineRatio = gameState.adrenaline / 100;
+      sound.updateAdrenalineAudio(proximity, adrenalineRatio);
+
+      const adVignette = document.getElementById('adrenaline-vignette');
+      const pulseSpeed = 6 + Math.max(proximity, adrenalineRatio) * 15;
+      const beatWave = 0.5 + 0.5 * Math.sin(elapsed * pulseSpeed);
+      const vignetteStrength = Math.max(proximity * 0.65, adrenalineRatio * 0.92);
+      adVignette.style.opacity = (vignetteStrength * (0.4 + beatWave * 0.6)).toFixed(3);
+
+      // Update HUD Adrenaline Gauge & Callout
+      document.getElementById('adrenaline-fill').style.width = `${gameState.adrenaline}%`;
+      const adStatusEl = document.getElementById('adrenaline-status-text');
+      const statusGroupEl = document.getElementById('status-group');
+      if (isActivelyTracking) {
+        adStatusEl.textContent = 'BOSS TRACKING YOU — ADRENALINE SURGE!';
+        adStatusEl.classList.add('active');
+        statusGroupEl.classList.add('adrenaline-surging');
+      } else if (gameState.adrenalineRushActive) {
+        adStatusEl.textContent = 'ADRENALINE RUSH (+20% SPEED)';
+        adStatusEl.classList.add('active');
+        statusGroupEl.classList.add('adrenaline-surging');
+      } else if (gameState.adrenaline > 5) {
+        adStatusEl.textContent = 'COOLING DOWN';
+        adStatusEl.classList.remove('active');
+        statusGroupEl.classList.remove('adrenaline-surging');
+      } else {
+        adStatusEl.textContent = 'CALM';
+        adStatusEl.classList.remove('active');
+        statusGroupEl.classList.remove('adrenaline-surging');
+      }
+
+      // Eerie electromagnetic flashlight flicker when Tree Demon is within 15m
+      if (gameState.flashlightOn) {
+        if (distToPlayer < 15) {
+          const flickerChance = (1 - distToPlayer / 15) * 0.25;
+          if (Math.random() < flickerChance) {
+            const dim = 0.5 + Math.random() * 1.4;
+            flashlight.intensity = dim;
+            beamConeMat.opacity = dim * 0.085;
+          } else {
+            flashlight.intensity = 3.8;
+            beamConeMat.opacity = 0.32;
+          }
+        } else {
+          flashlight.intensity = 3.8;
+          beamConeMat.opacity = 0.32;
+        }
+      }
+
+      if (distToPlayer < 1.85 && gameState.phase === 'PLAYING') {
+        triggerJumpscare();
+      }
+
+      return proximity;
+    }
+
+    // =========================================================================
+    // 8. RELIC CLEANSE, "RELIC SENSE" NEAREST WHISPER & EXIT GATE UNSEAL
+    // =========================================================================
+    const nearestPipEl = document.getElementById('nearest-relic-pip');
+    const senseLabelEl = document.getElementById('sense-label');
+
+    function updateRelicSenseHUD() {
+      const camForwardX = -Math.sin(player.yaw);
+      const camForwardZ = -Math.cos(player.yaw);
+      const camRightX = Math.cos(player.yaw);
+      const camRightZ = -Math.sin(player.yaw);
+
+      if (!gameState.gateUnlocked) {
+        let nearest = null;
+        let minDist = Infinity;
+        for (let i = 0; i < altars.length; i++) {
+          if (altars[i].collected) continue;
+          const d = Math.hypot(altars[i].pos.x - player.pos.x, altars[i].pos.z - player.pos.z);
+          if (d < minDist) {
+            minDist = d;
+            nearest = altars[i];
+          }
+        }
+
+        if (nearest) {
+          nearestPipEl.style.display = 'block';
+          nearestPipEl.classList.remove('gate-mode');
+          senseLabelEl.textContent = `Relic Sense • ${Math.round(minDist)}m`;
+
+          const dx = nearest.pos.x - player.pos.x;
+          const dz = nearest.pos.z - player.pos.z;
+          const dist = Math.hypot(dx, dz) || 1;
+          const nx = dx / dist;
+          const nz = dz / dist;
+
+          const dotForward = nx * camForwardX + nz * camForwardZ;
+          const dotRight = nx * camRightX + nz * camRightZ;
+          const relAngle = Math.atan2(dotRight, dotForward);
+          const normalized = Math.max(-1, Math.min(1, relAngle / (Math.PI * 0.75)));
+
+          nearestPipEl.style.left = `${50 + normalized * 42}%`;
+          const scale = Math.max(0.7, Math.min(1.35, 1.35 - dist / 95));
+          nearestPipEl.style.transform = `scale(${scale.toFixed(2)})`;
+        }
+      } else {
+        nearestPipEl.style.display = 'block';
+        nearestPipEl.classList.add('gate-mode');
+
+        const dx = EXIT_POS.x - player.pos.x;
+        const dz = EXIT_POS.z - player.pos.z;
+        const dist = Math.hypot(dx, dz) || 1;
+        senseLabelEl.textContent = `Northern Exit Gate • ${Math.round(dist)}m`;
+
+        const nx = dx / dist;
+        const nz = dz / dist;
+        const dotForward = nx * camForwardX + nz * camForwardZ;
+        const dotRight = nx * camRightX + nz * camRightZ;
+        const relAngle = Math.atan2(dotRight, dotForward);
+        const normalized = Math.max(-1, Math.min(1, relAngle / (Math.PI * 0.75)));
+        nearestPipEl.style.left = `${50 + normalized * 42}%`;
+        nearestPipEl.style.transform = 'scale(1.15)';
+      }
+    }
+
+    function collectAltarRelic(altar) {
+      if (!altar || altar.collected) return;
+      altar.collected = true;
+      altar.coreMesh.visible = false;
+      altar.ring1.visible = false;
+      altar.ring2.visible = false;
+      altar.pillarInner.visible = false;
+      altar.pillarOuter.visible = false;
+      altar.runeCircle.visible = false;
+      altar.wisps.visible = false;
+
+      gameState.relicsCollected++;
+      sound.playRelicPickup(gameState.relicsCollected);
+
+      const pips = document.querySelectorAll('.relic-pip');
+      if (pips[gameState.relicsCollected - 1]) {
+        pips[gameState.relicsCollected - 1].classList.add('collected');
+      }
+      document.getElementById('relic-count-text').textContent = `${gameState.relicsCollected} / ${TOTAL_RELICS} Relics`;
+
+      if (gameState.relicsCollected >= TOTAL_RELICS) {
+        unlockExitGate();
+      } else {
+        showBanner(`Relic Collected (${gameState.relicsCollected}/${TOTAL_RELICS}) — The Woods Stir...`);
+        if (demonAI.state === 'PATROL') {
+          demonAI.state = 'INVESTIGATE';
+          demonAI.stateTimer = 4.5;
+          demonAI.targetPos.copy(altar.pos);
+        }
+      }
+    }
+
+    function handleInteractAction() {
+      if (gameState.nearestAltar && !gameState.nearestAltar.collected) {
+        collectAltarRelic(gameState.nearestAltar);
+        return;
+      }
+      if (gameState.gateUnlocked && Math.hypot(player.pos.x - EXIT_POS.x, player.pos.z - EXIT_POS.z) < 4.8) {
+        startEscapeCutscene();
+      }
+    }
+
+    function unlockExitGate() {
+      gameState.gateUnlocked = true;
+      exitGate.wardBarsGroup.visible = false;
+      exitGate.sealMat.color.setHex(0xffd166);
+      exitGate.sealMat.emissive.setHex(0x00f5d4);
+      exitGate.sealMat.opacity = 0.14;
+      exitGate.runeMat.color.setHex(0xffd166);
+      exitGate.runeMat.emissive.setHex(0x00f5d4);
+      exitGate.brazierFireMat.color.setHex(0xffd166);
+      exitGate.brazierFireMat.emissive.setHex(0xffd166);
+      exitGate.beaconBeam.visible = true;
+
+      document.getElementById('objective-text').innerHTML =
+        '<strong style="color:#ffd166">ALL 5 RELICS COLLECTED!</strong> Sprint to the Northern Exit Gate!';
+      showBanner('THE NORTHERN EXIT GATE IS UNSEALED — ESCAPE NOW!');
+      sound.playDemonRoar();
+    }
+
+    let bannerTimeout = null;
+    function showBanner(msg) {
+      const el = document.getElementById('status-banner');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(bannerTimeout);
+      bannerTimeout = setTimeout(() => {
+        el.classList.remove('show');
+      }, 3600);
+    }
+
+    // =========================================================================
+    // 9. REAL-TIME 3D CINEMATIC ESCAPE CUTSCENE (4 PHASES + SKIP)
+    // =========================================================================
+    function startEscapeCutscene() {
+      if (gameState.phase === 'CUTSCENE') return;
+      gameState.phase = 'CUTSCENE';
+      gameState.cutsceneTimer = 0;
+      gameState.cutsceneSlam1Done = false;
+      gameState.cutsceneSlam2Done = false;
+      gameState.cutsceneSealLocked = false;
+
+      if (document.pointerLockElement) {
+        document.exitPointerLock();
+      }
+
+      document.body.classList.add('cutscene-active');
+      document.getElementById('hud').style.display = 'none';
+      document.getElementById('touch-controls').classList.remove('active');
+      document.getElementById('adrenaline-vignette').style.opacity = '0';
+      document.getElementById('skip-cutscene-btn').classList.add('visible');
+
+      camera.fov = BASE_FOV;
+      camera.far = 115;
+      camera.updateProjectionMatrix();
+      skyDome.scale.setScalar(1.0);
+      cloudDome.scale.setScalar(1.0);
+      moonMesh.position.copy(moonBasePos);
+      moonMesh.scale.setScalar(1.0);
+
+      player.pos.set(0, 1.68, -71.5);
+      player.yaw = 0;
+      player.pitch = 0;
+
+      demonAI.pos.set(0, 0, -56);
+      demonAI.yaw = Math.PI;
+      demonModel.mesh.position.copy(demonAI.pos);
+      demonModel.mesh.rotation.y = demonAI.yaw;
+      demonShadowDisc.position.set(demonAI.pos.x, 0.016, demonAI.pos.z);
+
+      sound.playCutsceneEscapeScore();
+      if (sound.ctx) {
+        sound.triggerBreathCycle(sound.ctx.currentTime, 1.0);
+      }
+    }
+
+    function updateEscapeCutscene(dt, elapsed) {
+      gameState.cutsceneTimer += dt;
+      const t = gameState.cutsceneTimer;
+      const captionEl = document.getElementById('cutscene-caption');
+
+      if (exitGate.shockwaveLife > 0) {
+        exitGate.shockwaveLife = Math.max(0, exitGate.shockwaveLife - dt * 1.4);
+        const s = 0.4 + (1 - exitGate.shockwaveLife) * 5.2;
+        exitGate.shockwaveRing.scale.set(s, s, 1);
+        exitGate.shockwaveRing.material.opacity = exitGate.shockwaveLife * 0.9;
+      }
+      if (exitGate.sparks.material.opacity > 0) {
+        exitGate.sparks.material.opacity = Math.max(0, exitGate.sparks.material.opacity - dt * 1.35);
+        const arr = exitGate.sparks.geometry.attributes.position.array;
+        for (let i = 0; i < exitGate.sparkVel.length; i++) {
+          arr[i * 3] += exitGate.sparkVel[i].x * dt;
+          arr[i * 3 + 1] += exitGate.sparkVel[i].y * dt;
+          arr[i * 3 + 2] += exitGate.sparkVel[i].z * dt;
+          exitGate.sparkVel[i].y -= 9.8 * dt;
+        }
+        exitGate.sparks.geometry.attributes.position.needsUpdate = true;
+      }
+
+      // PHASE 1 (0.0s – 3.0s): Sprint/stumble out of the forest archway onto moonlit path
+      if (t < 3.0) {
+        const p1 = t / 3.0;
+        captionEl.textContent = 'YOU BREAK THROUGH THE NORTHERN ARCHWAY...';
+        captionEl.classList.add('visible');
+
+        const camZ = -71.5 - p1 * 13.5;
+        const stumbleBob = Math.sin(t * 14) * 0.12 * (1 - p1 * 0.4);
+        const stumbleRoll = Math.sin(t * 7) * 0.045 * (1 - p1 * 0.5);
+        camera.position.set(Math.sin(t * 3.5) * 0.22, 1.65 + stumbleBob, camZ);
+        camera.rotation.set(-0.04 + stumbleBob * 0.2, Math.sin(t * 2.2) * 0.06, stumbleRoll);
+
+        if (sound.initialized && !sound.muted && Math.floor(t * 1.6) !== Math.floor((t - dt) * 1.6)) {
+          sound.triggerBreathCycle(sound.ctx.currentTime, 0.85);
+        }
+
+        demonAI.pos.z = -56 - p1 * 13.6;
+        demonAI.yaw = Math.PI;
+        demonModel.mesh.position.copy(demonAI.pos);
+        demonModel.mesh.rotation.y = demonAI.yaw;
+        demonShadowDisc.position.set(demonAI.pos.x, 0.016, demonAI.pos.z);
+
+        const runCycle = t * 11;
+        const sw = Math.sin(runCycle);
+        demonModel.pelvis.position.y = 1.09 + Math.abs(Math.cos(runCycle)) * 0.12;
+        demonModel.torso.rotation.x = 0.34;
+        demonModel.arms.left.shoulder.rotation.x = -0.4 + sw * 0.65;
+        demonModel.arms.right.shoulder.rotation.x = -0.4 - sw * 0.65;
+        demonModel.legs.left.hip.rotation.x = -sw * 0.62;
+        demonModel.legs.right.hip.rotation.x = sw * 0.62;
+      }
+      // PHASE 2 (3.0s – 7.0s): Camera whips back 180°; Tree Demon slams claws against ward barrier
+      else if (t < 7.0) {
+        const p2 = (t - 3.0) / 4.0;
+        captionEl.textContent = 'THE ANCIENT WARD BARRIER REPELS THE DEMON!';
+
+        const whipProgress = Math.min(1, (t - 3.0) / 0.55);
+        const smoothWhip = 1 - Math.pow(1 - whipProgress, 3);
+        const camYaw = smoothWhip * Math.PI;
+
+        if (t >= 4.3 && !gameState.cutsceneSlam1Done) {
+          gameState.cutsceneSlam1Done = true;
+          sound.playDemonRoar();
+          exitGate.sealMat.color.setHex(0x00f5d4);
+          exitGate.sealMat.emissive.setHex(0xffd166);
+          exitGate.sealMat.opacity = 0.68;
+          triggerGateBarrierImpact(2.2);
+        }
+        if (t >= 5.7 && !gameState.cutsceneSlam2Done) {
+          gameState.cutsceneSlam2Done = true;
+          triggerGateBarrierImpact(1.9);
+        }
+
+        let slamShake = 0;
+        if (t >= 4.3 && t < 5.0) slamShake = (1 - (t - 4.3) / 0.7) * 0.24;
+        if (t >= 5.7 && t < 6.4) slamShake = (1 - (t - 5.7) / 0.7) * 0.26;
+
+        camera.position.set(
+          (Math.random() - 0.5) * slamShake,
+          1.72 + (Math.random() - 0.5) * slamShake,
+          -85.0 - p2 * 2.5
+        );
+        camera.rotation.set(0.05, camYaw, 0);
+
+        demonAI.pos.set(0, 0, -69.7);
+        demonAI.yaw = Math.PI;
+        demonModel.mesh.position.copy(demonAI.pos);
+        demonModel.mesh.rotation.y = demonAI.yaw;
+        demonShadowDisc.position.set(demonAI.pos.x, 0.016, demonAI.pos.z);
+
+        const slamWave = Math.sin((t - 3.0) * Math.PI * 1.45);
+        demonModel.torso.rotation.x = 0.25 + Math.max(0, slamWave) * 0.25;
+        demonModel.head.rotation.x = -0.25 - Math.max(0, slamWave) * 0.2;
+        demonModel.arms.left.shoulder.rotation.x = -1.35 + slamWave * 0.55;
+        demonModel.arms.right.shoulder.rotation.x = -1.35 + slamWave * 0.55;
+        demonModel.arms.left.shoulder.rotation.z = -0.22;
+        demonModel.arms.right.shoulder.rotation.z = 0.22;
+      }
+      // PHASE 3 (7.0s – 10.5s): Dawn breaks, lifting dark fog, while Tree Demon retreats
+      else if (t < 10.5) {
+        const p3 = (t - 7.0) / 3.5;
+        captionEl.textContent = 'FIRST LIGHT PIERCES THE CURSED WOODS...';
+
+        if (!gameState.cutsceneSealLocked) {
+          gameState.cutsceneSealLocked = true;
+          sound.playBarrierSlam();
+          exitGate.wardBarsGroup.visible = true;
+          exitGate.wardBarsGroup.children.forEach((bar) => {
+            bar.material = new THREE.MeshStandardMaterial({
+              color: 0xffd166,
+              emissive: 0x00f5d4,
+              emissiveIntensity: 2.0
+            });
+          });
+        }
+
+        exitGate.sealMat.color.setHex(0xffd166);
+        exitGate.sealMat.emissive.setHex(0x00f5d4);
+        exitGate.sealMat.opacity = 0.46 + Math.sin(elapsed * 5) * 0.08;
+
+        // Smooth transition to golden-blue dawn lighting & lifted fog
+        scene.background.lerpColors(NIGHT_BG_COLOR, DAWN_BG_COLOR, p3);
+        scene.fog.color.lerpColors(NIGHT_BG_COLOR, DAWN_BG_COLOR, p3);
+        scene.fog.density = 0.035 - p3 * 0.021;
+        hemiLight.color.lerpColors(new THREE.Color(0x182638), new THREE.Color(0x93c5fd), p3);
+        hemiLight.groundColor.lerpColors(new THREE.Color(0x040605), new THREE.Color(0x2c3a2e), p3);
+        hemiLight.intensity = 0.32 + p3 * 0.98;
+        moonLight.color.lerpColors(new THREE.Color(0x4a6b94), new THREE.Color(0xfbd38d), p3);
+        moonLight.intensity = 0.38 + p3 * 1.28;
+        skyMat.color.lerpColors(new THREE.Color(0xffffff), new THREE.Color(0x7ba7d4), p3);
+        cloudMat.color.lerpColors(new THREE.Color(0xffffff), new THREE.Color(0x9ab8d9), p3);
+        cloudMat.opacity = 0.84 - p3 * 0.38;
+        moonMat.opacity = 0.92 - p3 * 0.42;
+
+        const turnProgress = Math.min(1, p3 / 0.28);
+        demonAI.yaw = Math.PI * (1 - turnProgress);
+        const retreatDist = Math.max(0, p3 - 0.2) * 18;
+        demonAI.pos.set(0, 0, -69.7 + retreatDist);
+        demonModel.mesh.position.copy(demonAI.pos);
+        demonModel.mesh.rotation.y = demonAI.yaw;
+        demonShadowDisc.position.set(demonAI.pos.x, 0.016, demonAI.pos.z);
+
+        const retreatCycle = t * 6.5;
+        const rSwing = Math.sin(retreatCycle);
+        demonModel.torso.rotation.x = 0.14;
+        demonModel.arms.left.shoulder.rotation.x = -0.25 + rSwing * 0.35;
+        demonModel.arms.right.shoulder.rotation.x = -0.25 - rSwing * 0.35;
+        demonModel.legs.left.hip.rotation.x = -rSwing * 0.42;
+        demonModel.legs.right.hip.rotation.x = rSwing * 0.42;
+
+        camera.position.set(Math.sin(p3 * 1.2) * 1.4, 1.85 + p3 * 0.35, -87.5 - p3 * 1.5);
+        camera.lookAt(0, 2.6, -72);
+      }
+      // PHASE 4 (10.5s+): Victory Overlay
+      else {
+        finishEscapeCutsceneToVictory();
+      }
+    }
+
+    function skipEscapeCutscene() {
+      if (gameState.phase !== 'CUTSCENE') return;
+      exitGate.wardBarsGroup.visible = true;
+      exitGate.wardBarsGroup.children.forEach((bar) => {
+        bar.material = new THREE.MeshStandardMaterial({
+          color: 0xffd166,
+          emissive: 0x00f5d4,
+          emissiveIntensity: 2.0
+        });
+      });
+      exitGate.sealMat.color.setHex(0xffd166);
+      exitGate.sealMat.emissive.setHex(0x00f5d4);
+      exitGate.sealMat.opacity = 0.48;
+
+      scene.background.copy(DAWN_BG_COLOR);
+      scene.fog.color.copy(DAWN_BG_COLOR);
+      scene.fog.density = 0.014;
+      hemiLight.color.setHex(0x93c5fd);
+      hemiLight.groundColor.setHex(0x2c3a2e);
+      hemiLight.intensity = 1.3;
+      moonLight.color.setHex(0xfbd38d);
+      moonLight.intensity = 1.65;
+      skyMat.color.setHex(0x7ba7d4);
+      cloudMat.color.setHex(0x9ab8d9);
+      cloudMat.opacity = 0.46;
+      moonMat.opacity = 0.50;
+
+      demonAI.pos.set(0, 0, -54);
+      demonAI.yaw = 0;
+      demonModel.mesh.position.copy(demonAI.pos);
+      demonModel.mesh.rotation.y = 0;
+      demonShadowDisc.position.set(demonAI.pos.x, 0.016, demonAI.pos.z);
+
+      camera.position.set(1.2, 2.2, -89.0);
+      camera.lookAt(0, 2.6, -72);
+
+      finishEscapeCutsceneToVictory();
+    }
+
+    function finishEscapeCutsceneToVictory() {
+      if (gameState.phase === 'VICTORY') return;
+      gameState.phase = 'VICTORY';
+
+      document.body.classList.remove('cutscene-active');
+      document.getElementById('skip-cutscene-btn').classList.remove('visible');
+      document.getElementById('cutscene-caption').classList.remove('visible');
+
+      document.getElementById('win-time').textContent = formatTime(gameState.elapsedTime);
+      document.getElementById('win-escapes').textContent = `${gameState.bossEscapes} / ${gameState.adrenalineSurges}`;
+      document.getElementById('victory-screen').classList.remove('hidden');
+    }
+
+    document.getElementById('skip-cutscene-btn').addEventListener('click', skipEscapeCutscene);
+
+    // =========================================================================
+    // 10. JUMPSCARE, GAME OVER & RESET FLOW
+    // =========================================================================
+    function triggerJumpscare() {
+      gameState.phase = 'JUMPSCARE';
+      gameState.jumpscareTimer = 1.25;
+      sound.playJumpscare();
+
+      if (document.pointerLockElement) {
+        document.exitPointerLock();
+      }
+
+      const forwardX = -Math.sin(player.yaw);
+      const forwardZ = -Math.cos(player.yaw);
+      demonAI.pos.set(player.pos.x + forwardX * 1.45, 0, player.pos.z + forwardZ * 1.45);
+      demonAI.yaw = Math.atan2(-forwardX, -forwardZ);
+      demonModel.mesh.position.copy(demonAI.pos);
+      demonModel.mesh.rotation.y = demonAI.yaw;
+      demonShadowDisc.position.set(demonAI.pos.x, 0.016, demonAI.pos.z);
+      demonModel.torso.rotation.x = 0.35;
+      demonModel.arms.left.shoulder.rotation.x = -1.35;
+      demonModel.arms.right.shoulder.rotation.x = -1.35;
+
+      document.getElementById('jumpscare-flash').style.opacity = '0.9';
+    }
+
+    function showGameOver() {
+      gameState.phase = 'GAMEOVER';
+      document.getElementById('jumpscare-flash').style.opacity = '0';
+      document.getElementById('adrenaline-vignette').style.opacity = '0';
+      document.getElementById('hud').style.display = 'none';
+      document.getElementById('touch-controls').classList.remove('active');
+      document.getElementById('go-relics').textContent = `${gameState.relicsCollected} / ${TOTAL_RELICS}`;
+      document.getElementById('go-time').textContent = formatTime(gameState.elapsedTime);
+      document.getElementById('go-escapes').textContent = `${gameState.bossEscapes}`;
+      document.getElementById('gameover-screen').classList.remove('hidden');
+    }
+
+    function resetAndStartGame() {
+      sound.init();
+
+      gameState.phase = 'PLAYING';
+      gameState.elapsedTime = 0;
+      gameState.relicsCollected = 0;
+      gameState.gateUnlocked = false;
+      gameState.flashlightOn = true;
+      gameState.stamina = 100;
+      gameState.exhausted = false;
+      gameState.adrenaline = 0;
+      gameState.adrenalineRushActive = false;
+      gameState.adrenalineSurges = 0;
+      gameState.bossEscapes = 0;
+      gameState.wasTrackedLastFrame = false;
+      gameState.isCrouching = false;
+      gameState.isSprinting = false;
+      gameState.nearestAltar = null;
+
+      scene.background.copy(NIGHT_BG_COLOR);
+      scene.fog.color.copy(NIGHT_BG_COLOR);
+      hemiLight.color.setHex(0x182638);
+      hemiLight.groundColor.setHex(0x040605);
+      hemiLight.intensity = 0.32;
+      moonLight.color.setHex(0x4a6b94);
+      moonLight.intensity = 0.38;
+      skyMat.color.setHex(0xffffff);
+      cloudMat.color.setHex(0xffffff);
+      cloudMat.opacity = 0.84;
+      moonMat.opacity = 0.92;
+
+      camera.fov = BASE_FOV;
+      applyQualityTier(qualityState.activeTier);
+
+      player.eyeOffset = 1.68;
+      player.pos.set(0, player.eyeOffset, 62);
+      player.vel.set(0, 0, 0);
+      player.yaw = 0;
+      player.pitch = 0;
+
+      flashlight.visible = true;
+      beamConeMesh.visible = true;
+      document.getElementById('light-indicator').classList.remove('off');
+      document.getElementById('light-status-text').textContent = 'ON';
+
+      altars.forEach((a) => {
+        a.collected = false;
+        a.coreMesh.visible = true;
+        a.ring1.visible = true;
+        a.ring2.visible = true;
+        a.pillarInner.visible = true;
+        a.pillarOuter.visible = true;
+        a.runeCircle.visible = true;
+        a.wisps.visible = true;
+      });
+
+      const defaultBarMat = new THREE.MeshStandardMaterial({
+        color: 0x1e2428,
+        metalness: 0.75,
+        roughness: 0.35
+      });
+      exitGate.wardBarsGroup.visible = true;
+      exitGate.wardBarsGroup.children.forEach((bar) => {
+        bar.material = defaultBarMat;
+      });
+      exitGate.sealMat.color.setHex(0xff1744);
+      exitGate.sealMat.emissive.setHex(0xff1744);
+      exitGate.sealMat.opacity = 0.42;
+      exitGate.runeMat.color.setHex(0xff1744);
+      exitGate.runeMat.emissive.setHex(0xff1744);
+      exitGate.brazierFireMat.color.setHex(0xff1744);
+      exitGate.brazierFireMat.emissive.setHex(0xff1744);
+      exitGate.beaconBeam.visible = false;
+
+      demonAI.pos.set(14, 0, -26);
+      demonAI.yaw = 0;
+      demonAI.state = 'PATROL';
+      pickNextPatrolTarget();
+
+      document.querySelectorAll('.relic-pip').forEach((p) => p.classList.remove('collected'));
+      document.getElementById('relic-count-text').textContent = `0 / ${TOTAL_RELICS} Relics`;
+      document.getElementById('objective-text').textContent =
+        'Follow the glowing spectral pillars to cleanse 5 Forest Seal Relics.';
+      document.getElementById('adrenaline-vignette').style.opacity = '0';
+      document.getElementById('jumpscare-flash').style.opacity = '0';
+      document.body.classList.remove('cutscene-active');
+      document.getElementById('skip-cutscene-btn').classList.remove('visible');
+      document.getElementById('cutscene-caption').classList.remove('visible');
+
+      document.getElementById('title-screen').classList.add('hidden');
+      document.getElementById('pause-screen').classList.add('hidden');
+      document.getElementById('gameover-screen').classList.add('hidden');
+      document.getElementById('victory-screen').classList.add('hidden');
+      document.getElementById('hud').style.display = 'block';
+      document.getElementById('touch-controls').classList.add('active');
+
+      showBanner('Follow the Cyan-Gold Light Pillars & Relic Sense');
+
+      if (canvas.requestPointerLock) {
+        try {
+          canvas.requestPointerLock();
+        } catch (e) {}
+      }
+    }
+
+    function pauseGame() {
+      if (gameState.phase !== 'PLAYING') return;
+      gameState.phase = 'PAUSED';
+      if (document.pointerLockElement) document.exitPointerLock();
+      document.getElementById('pause-screen').classList.remove('hidden');
+    }
+
+    function resumeGame() {
+      if (gameState.phase !== 'PAUSED') return;
+      gameState.phase = 'PLAYING';
+      document.getElementById('pause-screen').classList.add('hidden');
+      if (canvas.requestPointerLock) {
+        try {
+          canvas.requestPointerLock();
+        } catch (e) {}
+      }
+    }
+
+    function handleMuteToggle() {
+      sound.init();
+      const muted = sound.toggleMute();
+      document.getElementById('mute-btn').textContent = muted ? '🔇 Muted' : '🔊 Audio';
+    }
+
+    document.getElementById('start-btn').addEventListener('click', resetAndStartGame);
+    document.getElementById('retry-btn').addEventListener('click', resetAndStartGame);
+    document.getElementById('play-again-btn').addEventListener('click', resetAndStartGame);
+    document.getElementById('resume-btn').addEventListener('click', resumeGame);
+    document.getElementById('pause-btn').addEventListener('click', pauseGame);
+    document.getElementById('mute-btn').addEventListener('click', handleMuteToggle);
+
+    function formatTime(sec) {
+      const m = Math.floor(sec / 60);
+      const s = Math.floor(sec % 60);
+      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    // =========================================================================
+    // 11. ZERO-ALLOCATION PLAYER UPDATE & MAIN RENDER LOOP
+    // =========================================================================
+    const clock = new THREE.Clock();
+    const fpsChipEl = document.getElementById('fps-chip');
+
+    function updatePlayer(dt, proximityToDemon) {
+      let moveForward = 0;
+      let moveRight = 0;
+      if (keys['KeyW'] || keys['ArrowUp']) moveForward += 1;
+      if (keys['KeyS'] || keys['ArrowDown']) moveForward -= 1;
+      if (keys['KeyD'] || keys['ArrowRight']) moveRight += 1;
+      if (keys['KeyA'] || keys['ArrowLeft']) moveRight -= 1;
+
+      if (joystick.active) {
+        moveForward -= joystick.dy;
+        moveRight += joystick.dx;
+      }
+
+      const inputMag = Math.hypot(moveForward, moveRight);
+      if (inputMag > 1) {
+        moveForward /= inputMag;
+        moveRight /= inputMag;
+      }
+
+      // Sprint, Stamina & Adrenaline Rush Modifiers
+      const wantsSprint = (keys['ShiftLeft'] || keys['ShiftRight']) && inputMag > 0.15 && !gameState.isCrouching;
+      const isRush = gameState.adrenalineRushActive;
+
+      if (wantsSprint && !gameState.exhausted && gameState.stamina > 0) {
+        gameState.isSprinting = true;
+        const drainRate = isRush ? 8.0 : 25.0;
+        gameState.stamina = Math.max(0, gameState.stamina - drainRate * dt);
+        if (gameState.stamina <= 0.5) {
+          gameState.exhausted = true;
+          gameState.isSprinting = false;
+        }
+      } else {
+        gameState.isSprinting = false;
+        const regenRate = isRush ? 32.0 : (gameState.exhausted ? 14.0 : 21.0);
+        gameState.stamina = Math.min(100, gameState.stamina + regenRate * dt);
+        if (gameState.exhausted && gameState.stamina >= 28) {
+          gameState.exhausted = false;
+        }
+      }
+
+      const staminaFill = document.getElementById('stamina-fill');
+      staminaFill.style.width = `${gameState.stamina}%`;
+      staminaFill.classList.toggle('exhausted', gameState.exhausted);
+      staminaFill.classList.toggle('rush-boost', isRush && !gameState.exhausted);
+
+      const stealthDot = document.getElementById('stealth-dot');
+      const stealthText = document.getElementById('stealth-text');
+      if (gameState.flashlightOn) {
+        stealthDot.style.background = '#ffe082';
+        stealthText.textContent = 'Exposed (Light)';
+      } else if (gameState.isSprinting) {
+        stealthDot.style.background = '#ff5252';
+        stealthText.textContent = 'Loud (Running)';
+      } else if (gameState.isCrouching) {
+        stealthDot.style.background = '#00f5d4';
+        stealthText.textContent = 'Hidden (Shadow)';
+      } else {
+        stealthDot.style.background = '#5eead4';
+        stealthText.textContent = 'Low Profile';
+      }
+
+      // Movement Speeds: Walk 4.0 m/s, Crouch 2.2 m/s, Sprint 6.4 m/s (+20% = 7.68 m/s during Adrenaline Rush!)
+      const sprintSpeed = isRush ? 6.4 * 1.2 : 6.4;
+      const speed = gameState.isSprinting ? sprintSpeed : (gameState.isCrouching ? 2.2 : 4.0);
+
+      const forwardX = -Math.sin(player.yaw);
+      const forwardZ = -Math.cos(player.yaw);
+      const rightX = Math.cos(player.yaw);
+      const rightZ = -Math.sin(player.yaw);
+
+      const targetVx = (forwardX * moveForward + rightX * moveRight) * speed;
+      const targetVz = (forwardZ * moveForward + rightZ * moveRight) * speed;
+
+      const accel = Math.min(1, dt * 11);
+      player.vel.x += (targetVx - player.vel.x) * accel;
+      player.vel.z += (targetVz - player.vel.z) * accel;
+
+      player.pos.x += player.vel.x * dt;
+      player.pos.z += player.vel.z * dt;
+      resolveCollisions(player.pos, player.radius);
+
+      // Dynamic FOV widening smoothly (72 -> 82 deg) during Adrenaline Rush
+      const adRatio = gameState.adrenaline / 100;
+      const targetFov = BASE_FOV + (isRush ? Math.max(0.45, adRatio) * (RUSH_FOV - BASE_FOV) : adRatio * 4);
+      if (Math.abs(camera.fov - targetFov) > 0.05) {
+        camera.fov += (targetFov - camera.fov) * Math.min(1, dt * 5.5);
+        camera.updateProjectionMatrix();
+      }
+
+      // Crouch & head-bob
+      const targetEyeOffset = gameState.isCrouching ? 1.05 : 1.68;
+      player.eyeOffset += (targetEyeOffset - player.eyeOffset) * Math.min(1, dt * 9);
+      player.pos.y = player.eyeOffset;
+
+      const horizSpeed = Math.hypot(player.vel.x, player.vel.z);
+      let bobOffset = 0;
+      if (horizSpeed > 0.35) {
+        const bobFreq = gameState.isSprinting ? 14.5 : (gameState.isCrouching ? 6.5 : 9.8);
+        const bobAmp = gameState.isSprinting ? 0.085 : 0.045;
+        player.bobTimer += dt * bobFreq;
+        bobOffset = Math.sin(player.bobTimer) * bobAmp;
+        sound.playFootstep(gameState.isSprinting, gameState.isCrouching);
+      }
+
+      const shakeAmp = proximityToDemon * 0.024;
+      const shakeX = (Math.random() - 0.5) * shakeAmp;
+      const shakeY = (Math.random() - 0.5) * shakeAmp;
+
+      camera.position.set(player.pos.x + shakeX, player.pos.y + bobOffset + shakeY, player.pos.z);
+      camera.rotation.y = player.yaw;
+      camera.rotation.x = player.pitch;
+
+      const swayX = 0.18 + Math.cos(player.bobTimer * 0.5) * 0.025;
+      const swayY = -0.14 + bobOffset * 0.42;
+      flashlight.position.set(swayX, swayY, 0.05);
+      beamConeMesh.position.set(swayX, swayY, -0.15);
+
+      // Proximity to uncollected Relic Altars
+      let closest = null;
+      let closestDist = Infinity;
+      for (let i = 0; i < altars.length; i++) {
+        const a = altars[i];
+        if (a.collected) continue;
+        const d = Math.hypot(player.pos.x - a.pos.x, player.pos.z - a.pos.z);
+        if (d < closestDist) {
+          closestDist = d;
+          closest = a;
+        }
+      }
+      sound.updateRelicHum(closestDist);
+
+      if (closest && closestDist < 1.95) {
+        collectAltarRelic(closest);
+        closest = null;
+      }
+      gameState.nearestAltar = closestDist < 3.8 ? closest : null;
+
+      const promptEl = document.getElementById('interact-prompt');
+      const crosshairEl = document.getElementById('crosshair');
+      const distToGate = Math.hypot(player.pos.x - EXIT_POS.x, player.pos.z - EXIT_POS.z);
+
+      if (gameState.nearestAltar) {
+        promptEl.innerHTML = `<span class="key-badge">E</span> TAKE RELIC (${gameState.nearestAltar.name})`;
+        promptEl.classList.add('visible');
+        crosshairEl.classList.add('active');
+      } else if (distToGate < 4.8) {
+        if (gameState.gateUnlocked) {
+          promptEl.innerHTML = `<span class="key-badge">E</span> ESCAPE THROUGH NORTHERN GATE`;
+          promptEl.classList.add('visible');
+          crosshairEl.classList.add('active');
+        } else {
+          promptEl.innerHTML = `Gate Sealed — Collect ${TOTAL_RELICS - gameState.relicsCollected} More Relic(s)`;
+          promptEl.classList.add('visible');
+          crosshairEl.classList.remove('active');
+        }
+      } else {
+        promptEl.classList.remove('visible');
+        crosshairEl.classList.remove('active');
+      }
+
+      if (gameState.gateUnlocked && distToGate < 3.4) {
+        startEscapeCutscene();
+      }
+    }
+
+    function updateParticlesAndAuras(dt, elapsed) {
+      for (let i = 0; i < altars.length; i++) {
+        const a = altars[i];
+        if (a.collected) continue;
+
+        a.coreMesh.rotation.y = elapsed * 1.9 + i;
+        a.coreMesh.position.y = 1.78 + Math.sin(elapsed * 2.6 + i) * 0.12;
+        a.ring1.rotation.z = elapsed * 1.4;
+        a.ring1.rotation.x = Math.sin(elapsed * 1.1 + i) * 0.4;
+        a.ring2.rotation.y = -elapsed * 1.7;
+        a.runeCircle.rotation.z = elapsed * 0.35;
+        a.runeCircle.material.opacity = 0.6 + Math.sin(elapsed * 3.2 + i) * 0.22;
+
+        const wArr = a.wisps.geometry.attributes.position.array;
+        for (let w = 0; w < a.wispSeeds.length; w++) {
+          const s = a.wispSeeds[w];
+          const wy = (elapsed * s.speed + s.phase) % 14;
+          const swirlAng = s.ang + elapsed * 1.2 + wy * 0.25;
+          const swirlRad = s.rad * (1 - wy / 16);
+          wArr[w * 3] = Math.cos(swirlAng) * swirlRad;
+          wArr[w * 3 + 1] = wy;
+          wArr[w * 3 + 2] = Math.sin(swirlAng) * swirlRad;
+        }
+        a.wisps.geometry.attributes.position.needsUpdate = true;
+      }
+
+      if (exitGate) {
+        exitGate.crownGem.rotation.y = elapsed * 1.4;
+      }
+
+      const activeDust = Math.floor(MAX_DUST_COUNT * QUALITY_PRESETS[qualityState.activeTier].dustRatio);
+      const dArr = dustParticles.geometry.attributes.position.array;
+      for (let i = 0; i < activeDust; i++) {
+        const v = dustVelocities[i];
+        let dx = dArr[i * 3] + v.vx * dt;
+        let dy = dArr[i * 3 + 1] + v.vy * dt;
+        let dz = dArr[i * 3 + 2] + v.vz * dt;
+
+        if (dx - camera.position.x > 20) dx -= 40;
+        if (dx - camera.position.x < -20) dx += 40;
+        if (dz - camera.position.z > 20) dz -= 40;
+        if (dz - camera.position.z < -20) dz += 40;
+        if (dy > camera.position.y + 5.0) dy = Math.max(0.2, camera.position.y - 1.5);
+
+        dArr[i * 3] = dx;
+        dArr[i * 3 + 1] = dy;
+        dArr[i * 3 + 2] = dz;
+      }
+      dustParticles.geometry.attributes.position.needsUpdate = true;
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const rawDt = clock.getDelta();
+      const dt = Math.min(rawDt, 0.05);
+      const elapsed = clock.getElapsedTime();
+
+      // Slowly drift inner storm-cloud dome & billboard eerie moon toward camera
+      cloudDome.rotation.y += dt * 0.008;
+      moonMesh.lookAt(camera.position);
+
+      // Rolling FPS Monitor & Adaptive Quality Step-Down
+      qualityState.fpsFrames++;
+      qualityState.fpsTimer += rawDt;
+      if (qualityState.fpsTimer >= 0.75) {
+        qualityState.currentFps = Math.round(qualityState.fpsFrames / qualityState.fpsTimer);
+        fpsChipEl.textContent = `${qualityState.currentFps} FPS`;
+
+        if (qualityState.mode === 'AUTO' && gameState.phase === 'PLAYING') {
+          if (qualityState.currentFps < 42) {
+            qualityState.lowFpsStreak++;
+            if (qualityState.lowFpsStreak >= 2) {
+              qualityState.lowFpsStreak = 0;
+              if (qualityState.activeTier === 'HIGH') applyQualityTier('MED');
+              else if (qualityState.activeTier === 'MED') applyQualityTier('LOW');
+            }
+          } else {
+            qualityState.lowFpsStreak = 0;
+          }
+        }
+        qualityState.fpsFrames = 0;
+        qualityState.fpsTimer = 0;
+      }
+
+      updateParticlesAndAuras(dt, elapsed);
+
+      if (gameState.phase === 'TITLE') {
+        const previewAngle = elapsed * 0.22;
+        const previewZ = 52;
+        demonModel.mesh.position.set(0, 0, previewZ);
+        demonModel.mesh.rotation.y = Math.sin(elapsed * 0.4) * 0.35;
+        demonShadowDisc.position.set(0, 0.016, previewZ);
+        demonModel.arms.left.shoulder.rotation.x = -0.25 + Math.sin(elapsed * 1.5) * 0.12;
+        demonModel.arms.right.shoulder.rotation.x = -0.25 - Math.sin(elapsed * 1.5) * 0.12;
+        for (let v = 0; v < demonModel.vines.length; v++) {
+          demonModel.vines[v].rotation.z = Math.sin(elapsed * 2.2 + v) * 0.14;
+        }
+
+        camera.position.set(Math.sin(previewAngle) * 4.4, 1.85, 58.2);
+        camera.lookAt(0, 1.55, previewZ);
+      } else if (gameState.phase === 'PLAYING') {
+        gameState.elapsedTime += dt;
+        document.getElementById('timer-chip').textContent = formatTime(gameState.elapsedTime);
+
+        const proximity = updateTreeDemon(dt, elapsed);
+        updatePlayer(dt, proximity);
+        updateRelicSenseHUD();
+      } else if (gameState.phase === 'CUTSCENE') {
+        updateEscapeCutscene(dt, elapsed);
+      } else if (gameState.phase === 'VICTORY') {
+        camera.position.set(
+          1.2 + Math.sin(elapsed * 0.4) * 0.35,
+          2.2 + Math.cos(elapsed * 0.5) * 0.1,
+          -89.0
+        );
+        camera.lookAt(0, 2.6, -72);
+      } else if (gameState.phase === 'JUMPSCARE') {
+        gameState.jumpscareTimer -= dt;
+        camera.position.set(
+          player.pos.x + (Math.random() - 0.5) * 0.22,
+          player.pos.y + (Math.random() - 0.5) * 0.22,
+          player.pos.z
+        );
+        camera.lookAt(demonAI.pos.x, 1.85, demonAI.pos.z);
+
+        if (gameState.jumpscareTimer <= 0) {
+          showGameOver();
+        }
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      applyQualityTier(qualityState.activeTier);
+    });
+
+    window.onload = function () {
+      animate();
+    };
+  </script>
+</body>
+</html>
